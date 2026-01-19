@@ -1,26 +1,59 @@
 "use client"
 
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import { ExternalLink, Calendar, Info } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { ExternalLink, Calendar, Info, UserPlus, UserMinus, Users, Check } from "lucide-react"
 import type { Project, Associate, Milestone, Task } from "@/lib/mock-data"
+import { useAppStore } from "@/lib/store"
 import Link from "next/link"
+import { toast } from "sonner"
 
 interface ProjectOverviewProps {
   project: Project
   associates: Associate[]
   milestones: Milestone[]
   tasks: Task[]
+  canEdit?: boolean
 }
 
-export function ProjectOverview({ project, associates, milestones, tasks }: ProjectOverviewProps) {
+export function ProjectOverview({ project, associates, milestones, tasks, canEdit = true }: ProjectOverviewProps) {
+  const [manageTeamOpen, setManageTeamOpen] = useState(false)
+  const allAssociates = useAppStore((state) => state.associates)
+  const assignAssociateToProject = useAppStore((state) => state.assignAssociateToProject)
+  const removeAssociateFromProject = useAppStore((state) => state.removeAssociateFromProject)
+
   const upcomingMilestones = milestones
     .filter((m) => m.status !== "completed")
     .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
     .slice(0, 3)
+
+  const assignedIds = project.assignedAssociates
+  const unassignedAssociates = allAssociates.filter((a) => !assignedIds.includes(a.id))
+
+  const handleAddMember = (associateId: string) => {
+    const associate = allAssociates.find((a) => a.id === associateId)
+    assignAssociateToProject(associateId, project.id)
+    toast.success(`${associate?.name} added to the team`)
+  }
+
+  const handleRemoveMember = (associateId: string) => {
+    const associate = allAssociates.find((a) => a.id === associateId)
+    removeAssociateFromProject(associateId, project.id)
+    toast.success(`${associate?.name} removed from the team`)
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -64,9 +97,139 @@ export function ProjectOverview({ project, associates, milestones, tasks }: Proj
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Assigned Team</CardTitle>
-          <CardDescription>{associates.length} team members assigned</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Assigned Team
+            </CardTitle>
+            <CardDescription>{associates.length} team members assigned</CardDescription>
+          </div>
+          {canEdit && (
+            <Dialog open={manageTeamOpen} onOpenChange={setManageTeamOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Manage Team
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[85vh]">
+                <DialogHeader>
+                  <DialogTitle>Manage Project Team</DialogTitle>
+                  <DialogDescription>Add or remove team members from {project.name}</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-6 md:grid-cols-2 mt-4">
+                  {/* Current Team */}
+                  <div className="flex flex-col">
+                    <h4 className="mb-3 font-medium flex items-center gap-2 text-base">
+                      <Check className="h-5 w-5 text-green-500" />
+                      Current Team ({associates.length})
+                    </h4>
+                    <ScrollArea className="h-[400px] rounded-md border p-3 flex-1">
+                      {associates.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-8">No team members assigned</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {associates.map((associate) => {
+                            const associateTasks = tasks.filter((t) => t.assigneeId === associate.id)
+                            const openTasks = associateTasks.filter((t) => t.status !== "done").length
+                            return (
+                              <div key={associate.id} className="rounded-lg border p-3 bg-muted/30 space-y-3">
+                                <div className="flex items-center gap-3">
+                                  <Avatar className="h-10 w-10 shrink-0">
+                                    <AvatarImage src={associate.avatar || "/placeholder.svg"} alt={associate.name} />
+                                    <AvatarFallback>
+                                      {associate.name
+                                        .split(" ")
+                                        .map((n) => n[0])
+                                        .join("")}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="min-w-0">
+                                    <p className="font-medium truncate">{associate.name}</p>
+                                    <p className="text-sm text-muted-foreground">{associate.role}</p>
+                                    <p className="text-xs text-muted-foreground">{openTasks} open tasks</p>
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30 bg-transparent"
+                                  onClick={() => handleRemoveMember(associate.id)}
+                                >
+                                  <UserMinus className="mr-2 h-4 w-4" />
+                                  Remove from Team
+                                </Button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </div>
+
+                  {/* Available to Add */}
+                  <div className="flex flex-col">
+                    <h4 className="mb-3 font-medium flex items-center gap-2 text-base">
+                      <UserPlus className="h-5 w-5 text-blue-500" />
+                      Available to Add ({unassignedAssociates.length})
+                    </h4>
+                    <ScrollArea className="h-[400px] rounded-md border p-3 flex-1">
+                      {unassignedAssociates.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-8">All associates are assigned</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {unassignedAssociates.map((associate) => (
+                            <div
+                              key={associate.id}
+                              className="rounded-lg border p-3 hover:bg-muted/50 transition-colors space-y-3"
+                            >
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-10 w-10 shrink-0">
+                                  <AvatarImage src={associate.avatar || "/placeholder.svg"} alt={associate.name} />
+                                  <AvatarFallback>
+                                    {associate.name
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium truncate">{associate.name}</p>
+                                  <p className="text-sm text-muted-foreground">{associate.role}</p>
+                                  <Badge
+                                    variant={
+                                      associate.availability === "available"
+                                        ? "default"
+                                        : associate.availability === "busy"
+                                          ? "destructive"
+                                          : "secondary"
+                                    }
+                                    className="text-xs mt-1"
+                                  >
+                                    {associate.availability || "available"}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="w-full"
+                                onClick={() => handleAddMember(associate.id)}
+                              >
+                                <UserPlus className="mr-2 h-4 w-4" />
+                                Add to Team
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -168,9 +331,11 @@ export function ProjectOverview({ project, associates, milestones, tasks }: Proj
           ) : (
             <div className="py-8 text-center">
               <p className="text-muted-foreground">No monday.com board linked</p>
-              <Button variant="outline" className="mt-4 bg-transparent" disabled>
-                Link Board (Prototype)
-              </Button>
+              {canEdit && (
+                <Button variant="outline" className="mt-4 bg-transparent" disabled>
+                  Link Board (Prototype)
+                </Button>
+              )}
             </div>
           )}
         </CardContent>

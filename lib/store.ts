@@ -19,7 +19,107 @@ import {
   type CostingRequest,
   type ProjectHealth,
   type Client,
+  type ClientHealthFactor,
+  type ClientHealthHistoryEntry,
 } from "./mock-data"
+
+function calculateProjectProgress(projectId: string, milestones: Milestone[]): number {
+  const projectMilestones = milestones.filter((m) => m.projectId === projectId)
+  if (projectMilestones.length === 0) return 0
+  const totalCompletion = projectMilestones.reduce((sum, m) => sum + m.completion, 0)
+  return Math.round(totalCompletion / projectMilestones.length)
+}
+
+function updateProjectProgress(projects: Project[], projectId: string, milestones: Milestone[]): Project[] {
+  const newProgress = calculateProjectProgress(projectId, milestones)
+  return projects.map((p) => (p.id === projectId ? { ...p, milestonesProgress: newProgress } : p))
+}
+
+function calculateClientHealth(
+  clientName: string,
+  projects: Project[],
+  tasks: Task[],
+  milestones: Milestone[],
+  uploads: Upload[],
+  client: Client,
+): { score: number; factors: ClientHealthFactor[] } {
+  const clientProjects = projects.filter((p) => p.client === clientName)
+
+  if (clientProjects.length === 0) {
+    return {
+      score: client.status === "prospect" ? 0 : 75,
+      factors: [{ factor: "No Projects", score: 75, weight: 1, description: "No active projects to evaluate" }],
+    }
+  }
+
+  const factors: ClientHealthFactor[] = []
+
+  // Factor 1: Project Health (30% weight)
+  const projectHealthScores = clientProjects.map((p) => {
+    if (p.health === "on-track") return 100
+    if (p.health === "at-risk") return 50
+    return 20
+  })
+  const avgProjectHealth = projectHealthScores.reduce((a, b) => a + b, 0) / projectHealthScores.length
+  factors.push({
+    factor: "Project Health",
+    score: Math.round(avgProjectHealth),
+    weight: 0.3,
+    description: `${clientProjects.filter((p) => p.health === "on-track").length}/${clientProjects.length} projects on track`,
+  })
+
+  // Factor 2: Task Completion Rate (20% weight)
+  const clientTasks = tasks.filter((t) => clientProjects.some((p) => p.id === t.projectId))
+  const completedTasks = clientTasks.filter((t) => t.status === "done").length
+  const taskCompletionRate = clientTasks.length > 0 ? (completedTasks / clientTasks.length) * 100 : 100
+  factors.push({
+    factor: "Task Completion",
+    score: Math.round(taskCompletionRate),
+    weight: 0.2,
+    description: `${completedTasks}/${clientTasks.length} tasks completed`,
+  })
+
+  // Factor 3: Milestone Progress (20% weight)
+  const clientMilestones = milestones.filter((m) => clientProjects.some((p) => p.id === m.projectId))
+  const avgMilestoneProgress =
+    clientMilestones.length > 0
+      ? clientMilestones.reduce((sum, m) => sum + m.completion, 0) / clientMilestones.length
+      : 100
+  factors.push({
+    factor: "Milestone Progress",
+    score: Math.round(avgMilestoneProgress),
+    weight: 0.2,
+    description: `${Math.round(avgMilestoneProgress)}% average milestone completion`,
+  })
+
+  // Factor 4: Financial Health (15% weight)
+  const outstandingRatio = client.totalRevenue > 0 ? (1 - client.outstandingBalance / client.totalRevenue) * 100 : 100
+  factors.push({
+    factor: "Financial Health",
+    score: Math.round(Math.max(0, outstandingRatio)),
+    weight: 0.15,
+    description:
+      client.outstandingBalance > 0
+        ? `$${client.outstandingBalance.toLocaleString()} outstanding`
+        : "No outstanding balance",
+  })
+
+  // Factor 5: Document Approval Rate (15% weight)
+  const clientUploads = uploads.filter((u) => clientProjects.some((p) => p.id === u.projectId))
+  const approvedUploads = clientUploads.filter((u) => u.status === "approved").length
+  const approvalRate = clientUploads.length > 0 ? (approvedUploads / clientUploads.length) * 100 : 100
+  factors.push({
+    factor: "Document Approval",
+    score: Math.round(approvalRate),
+    weight: 0.15,
+    description: `${approvedUploads}/${clientUploads.length} documents approved`,
+  })
+
+  // Calculate weighted score
+  const score = Math.round(factors.reduce((sum, f) => sum + f.score * f.weight, 0))
+
+  return { score, factors }
+}
 
 interface AppState {
   projects: Project[]
@@ -39,6 +139,7 @@ interface AppState {
   updateProject: (id: string, updates: Partial<Project>) => void
   updateProjectLifecycle: (id: string, lifecycle: Project["lifecycle"]) => void
   updateProjectOnboardingStep: (id: string, step: number) => void
+  updateProjectNewBusinessStep: (id: string, step: number) => void
   updateProjectHealth: (id: string, health: ProjectHealth) => void
   toggleFinanceAutomation: (id: string) => void
   addRiskNote: (projectId: string, note: string) => void
@@ -56,10 +157,18 @@ interface AppState {
   addCostingRequest: (request: CostingRequest) => void
   updateCostingRequest: (id: string, updates: Partial<CostingRequest>) => void
   assignAssociateToProject: (associateId: string, projectId: string) => void
+  removeAssociateFromProject: (associateId: string, projectId: string) => void
   toggleMondayConnection: () => void
   syncWithMonday: () => void
   addClient: (client: Client) => void
   updateClient: (id: string, updates: Partial<Client>) => void
+
+  calculateClientHealthScore: (clientId: string) => { score: number; factors: ClientHealthFactor[] }
+  updateClientHealthOverride: (clientId: string, override: number | null, note?: string) => void
+  addClientHealthNote: (clientId: string, note: string) => void
+  addClientHealthAlert: (clientId: string, alert: string) => void
+  removeClientHealthAlert: (clientId: string, alert: string) => void
+  refreshAllClientHealth: () => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -92,6 +201,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         execution: "Execution",
         closure: "Closure",
         learnings: "Learnings",
+        completed: "Completed",
       }
       return {
         projects: state.projects.map((p) =>
@@ -101,7 +211,7 @@ export const useAppStore = create<AppState>((set, get) => ({
                 lifecycle,
                 lastUpdate: { date: now, user: currentUser.name },
                 auditLog: [
-                  { action: `Moved to ${lifecycleLabels[lifecycle]}`, user: currentUser.name, date: now },
+                  { action: `Moved to ${lifecycleLabels[lifecycle] || lifecycle}`, user: currentUser.name, date: now },
                   ...(p.auditLog || []),
                 ],
               }
@@ -123,6 +233,27 @@ export const useAppStore = create<AppState>((set, get) => ({
                 lastUpdate: { date: now, user: currentUser.name },
                 auditLog: [
                   { action: `Onboarding step changed to ${step}`, user: currentUser.name, date: now },
+                  ...p.auditLog,
+                ],
+              }
+            : p,
+        ),
+      }
+    }),
+
+  updateProjectNewBusinessStep: (id, step) =>
+    set((state) => {
+      const { currentUser } = get()
+      const now = new Date().toISOString().split("T")[0]
+      return {
+        projects: state.projects.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                newBusinessStep: step,
+                lastUpdate: { date: now, user: currentUser.name },
+                auditLog: [
+                  { action: `New Business step changed to ${step}`, user: currentUser.name, date: now },
                   ...p.auditLog,
                 ],
               }
@@ -223,9 +354,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         const milestoneTasks = newTasks.filter((t) => t.milestoneId === task.milestoneId)
         const completedTasks = milestoneTasks.filter((t) => t.status === "done").length
         const completion = Math.round((completedTasks / milestoneTasks.length) * 100)
+        const newMilestones = state.milestones.map((m) => (m.id === task.milestoneId ? { ...m, completion } : m))
+        const newProjects = updateProjectProgress(state.projects, milestone.projectId, newMilestones)
         return {
           tasks: newTasks,
-          milestones: state.milestones.map((m) => (m.id === task.milestoneId ? { ...m, completion } : m)),
+          milestones: newMilestones,
+          projects: newProjects,
         }
       }
       return { tasks: newTasks }
@@ -262,16 +396,44 @@ export const useAppStore = create<AppState>((set, get) => ({
       const completedTasks = milestoneTasks.filter((t) => t.status === "done").length
       const completion = milestoneTasks.length > 0 ? Math.round((completedTasks / milestoneTasks.length) * 100) : 0
 
+      const newMilestones = state.milestones.map((m) => (m.id === task.milestoneId ? { ...m, completion } : m))
+
+      const milestone = state.milestones.find((m) => m.id === task.milestoneId)
+      const newProjects = milestone
+        ? updateProjectProgress(state.projects, milestone.projectId, newMilestones)
+        : state.projects
+
       return {
         tasks: newTasks,
-        milestones: state.milestones.map((m) => (m.id === task.milestoneId ? { ...m, completion } : m)),
+        milestones: newMilestones,
+        projects: newProjects,
       }
     }),
 
   deleteTask: (id) =>
-    set((state) => ({
-      tasks: state.tasks.filter((t) => t.id !== id),
-    })),
+    set((state) => {
+      const task = state.tasks.find((t) => t.id === id)
+      if (!task) return { tasks: state.tasks.filter((t) => t.id !== id) }
+
+      const newTasks = state.tasks.filter((t) => t.id !== id)
+
+      const milestoneTasks = newTasks.filter((t) => t.milestoneId === task.milestoneId)
+      const completedTasks = milestoneTasks.filter((t) => t.status === "done").length
+      const completion = milestoneTasks.length > 0 ? Math.round((completedTasks / milestoneTasks.length) * 100) : 0
+
+      const newMilestones = state.milestones.map((m) => (m.id === task.milestoneId ? { ...m, completion } : m))
+
+      const milestone = state.milestones.find((m) => m.id === task.milestoneId)
+      const newProjects = milestone
+        ? updateProjectProgress(state.projects, milestone.projectId, newMilestones)
+        : state.projects
+
+      return {
+        tasks: newTasks,
+        milestones: newMilestones,
+        projects: newProjects,
+      }
+    }),
 
   addMilestone: (milestone) =>
     set((state) => ({
@@ -293,22 +455,40 @@ export const useAppStore = create<AppState>((set, get) => ({
         completion: 0,
       }
 
+      const newMilestones = [...state.milestones, newMilestone]
+      const newProjects = updateProjectProgress(state.projects, milestone.projectId, newMilestones)
+
       return {
-        milestones: [...state.milestones, newMilestone],
+        milestones: newMilestones,
         tasks: [...state.tasks, ...newTasks],
+        projects: newProjects,
       }
     }),
 
   updateMilestone: (id, updates) =>
-    set((state) => ({
-      milestones: state.milestones.map((m) => (m.id === id ? { ...m, ...updates } : m)),
-    })),
+    set((state) => {
+      const newMilestones = state.milestones.map((m) => (m.id === id ? { ...m, ...updates } : m))
+      const milestone = state.milestones.find((m) => m.id === id)
+      if (milestone && updates.completion !== undefined) {
+        const newProjects = updateProjectProgress(state.projects, milestone.projectId, newMilestones)
+        return { milestones: newMilestones, projects: newProjects }
+      }
+      return { milestones: newMilestones }
+    }),
 
   deleteMilestone: (id) =>
-    set((state) => ({
-      milestones: state.milestones.filter((m) => m.id !== id),
-      tasks: state.tasks.filter((t) => t.milestoneId !== id),
-    })),
+    set((state) => {
+      const milestone = state.milestones.find((m) => m.id === id)
+      const newMilestones = state.milestones.filter((m) => m.id !== id)
+      const newProjects = milestone
+        ? updateProjectProgress(state.projects, milestone.projectId, newMilestones)
+        : state.projects
+      return {
+        milestones: newMilestones,
+        tasks: state.tasks.filter((t) => t.milestoneId !== id),
+        projects: newProjects,
+      }
+    }),
 
   addUpload: (upload) => set((state) => ({ uploads: [...state.uploads, upload] })),
 
@@ -341,6 +521,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       ),
     })),
 
+  removeAssociateFromProject: (associateId, projectId) =>
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId ? { ...p, assignedAssociates: p.assignedAssociates.filter((id) => id !== associateId) } : p,
+      ),
+      associates: state.associates.map((a) =>
+        a.id === associateId ? { ...a, activeProjects: Math.max(0, a.activeProjects - 1) } : a,
+      ),
+    })),
+
   toggleMondayConnection: () => set((state) => ({ mondayConnected: !state.mondayConnected })),
 
   syncWithMonday: () => set(() => ({ lastSyncTime: new Date().toISOString() })),
@@ -351,4 +541,98 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       clients: state.clients.map((c) => (c.id === id ? { ...c, ...updates } : c)),
     })),
+
+  calculateClientHealthScore: (clientId) => {
+    const { clients, projects, tasks, milestones, uploads } = get()
+    const client = clients.find((c) => c.id === clientId)
+    if (!client) return { score: 0, factors: [] }
+
+    return calculateClientHealth(client.name, projects, tasks, milestones, uploads, client)
+  },
+
+  updateClientHealthOverride: (clientId, override, note) =>
+    set((state) => {
+      const { currentUser, projects, tasks, milestones, uploads } = get()
+      const now = new Date().toISOString().split("T")[0]
+      const client = state.clients.find((c) => c.id === clientId)
+      if (!client) return state
+
+      const { score: calculatedScore, factors } = calculateClientHealth(
+        client.name,
+        projects,
+        tasks,
+        milestones,
+        uploads,
+        client,
+      )
+
+      const finalScore = override !== null ? override : calculatedScore
+
+      const historyEntry: ClientHealthHistoryEntry = {
+        date: now,
+        score: finalScore,
+        factors,
+        note: note || (override !== null ? `Manual override to ${override}%` : "Auto-calculated"),
+        updatedBy: currentUser.name,
+        isManualOverride: override !== null,
+      }
+
+      return {
+        clients: state.clients.map((c) =>
+          c.id === clientId
+            ? {
+                ...c,
+                healthScore: finalScore,
+                healthOverride: override,
+                healthFactors: factors,
+                healthHistory: [historyEntry, ...(c.healthHistory || [])].slice(0, 30),
+              }
+            : c,
+        ),
+      }
+    }),
+
+  addClientHealthNote: (clientId, note) =>
+    set((state) => ({
+      clients: state.clients.map((c) => (c.id === clientId ? { ...c, healthNotes: note } : c)),
+    })),
+
+  addClientHealthAlert: (clientId, alert) =>
+    set((state) => ({
+      clients: state.clients.map((c) =>
+        c.id === clientId ? { ...c, healthAlerts: [...(c.healthAlerts || []), alert] } : c,
+      ),
+    })),
+
+  removeClientHealthAlert: (clientId, alert) =>
+    set((state) => ({
+      clients: state.clients.map((c) =>
+        c.id === clientId ? { ...c, healthAlerts: (c.healthAlerts || []).filter((a) => a !== alert) } : c,
+      ),
+    })),
+
+  refreshAllClientHealth: () =>
+    set((state) => {
+      const { projects, tasks, milestones, uploads } = get()
+      const now = new Date().toISOString().split("T")[0]
+
+      return {
+        clients: state.clients.map((client) => {
+          if (client.healthOverride !== null && client.healthOverride !== undefined) {
+            return client // Keep manual override
+          }
+
+          const { score, factors } = calculateClientHealth(client.name, projects, tasks, milestones, uploads, client)
+
+          return {
+            ...client,
+            healthScore: score,
+            healthFactors: factors,
+          }
+        }),
+      }
+    }),
 }))
+
+// Alias for backwards compatibility
+export const useStore = useAppStore

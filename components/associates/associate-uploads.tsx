@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAppStore } from "@/lib/store"
 import { FileText } from "lucide-react"
 import Link from "next/link"
@@ -12,7 +13,7 @@ interface AssociateUploadsProps {
 }
 
 export function AssociateUploads({ associateId }: AssociateUploadsProps) {
-  const { uploads, projects } = useAppStore()
+  const { uploads, projects, associates } = useAppStore()
 
   const associateUploads = uploads.filter((u) => u.uploadedById === associateId)
 
@@ -44,7 +45,7 @@ export function AssociateUploads({ associateId }: AssociateUploadsProps) {
                 <TableHead>File Name</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Project</TableHead>
-                <TableHead>Vendor</TableHead>
+                <TableHead>Associate</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
@@ -53,6 +54,7 @@ export function AssociateUploads({ associateId }: AssociateUploadsProps) {
             <TableBody>
               {associateUploads.map((upload) => {
                 const project = projects.find((p) => p.id === upload.projectId)
+                const associate = associates.find((a) => a.id === upload.associateId)
                 return (
                   <TableRow key={upload.id}>
                     <TableCell className="font-medium">{upload.fileName}</TableCell>
@@ -68,7 +70,24 @@ export function AssociateUploads({ associateId }: AssociateUploadsProps) {
                         "-"
                       )}
                     </TableCell>
-                    <TableCell>{upload.vendor}</TableCell>
+                    <TableCell>
+                      {associate ? (
+                        <Link href={`/associates/${associate.id}`} className="flex items-center gap-2 hover:underline">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={associate.avatar || "/placeholder.svg"} />
+                            <AvatarFallback className="text-xs">
+                              {associate.name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span>{associate.name}</span>
+                        </Link>
+                      ) : (
+                        upload.associate || "-"
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       {upload.currency} {upload.amount.toLocaleString()}
                     </TableCell>

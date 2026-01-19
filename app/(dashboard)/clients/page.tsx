@@ -5,13 +5,13 @@ import Link from "next/link"
 import { useAppStore } from "@/lib/store"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Building2, Search, Plus, TrendingUp, AlertTriangle, UserPlus, Globe } from "lucide-react"
+import { Building2, Search, TrendingUp, AlertTriangle, UserPlus, Globe } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ClientStatus, ClientTier } from "@/lib/mock-data"
+import { AddClientDialog } from "@/components/clients/add-client-dialog"
 
 function ClientsPageContent() {
   const { clients, projects, associates } = useAppStore()
@@ -19,14 +19,16 @@ function ClientsPageContent() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [tierFilter, setTierFilter] = useState<string>("all")
 
+  // Filter only standard clients
+  const standardClients = clients.filter((c) => c.clientType === "standard" || !c.clientType)
+
   // Calculate stats
-  const totalClients = clients.length
-  const activeClients = clients.filter((c) => c.status === "active").length
-  const atRiskClients = clients.filter((c) => c.healthScore < 60 && c.status === "active").length
-  const prospects = clients.filter((c) => c.status === "prospect").length
+  const activeClients = standardClients.filter((c) => c.status === "active").length
+  const atRiskClients = standardClients.filter((c) => c.healthScore < 60 && c.status === "active").length
+  const prospects = standardClients.filter((c) => c.status === "prospect").length
 
   // Filter clients
-  const filteredClients = clients.filter((client) => {
+  const filteredClients = standardClients.filter((client) => {
     const matchesSearch =
       client.name.toLowerCase().includes(search.toLowerCase()) ||
       client.industry.toLowerCase().includes(search.toLowerCase())
@@ -88,22 +90,19 @@ function ClientsPageContent() {
           <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
           <p className="text-muted-foreground">Manage your client relationships and engagements</p>
         </div>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Client
-        </Button>
+        <AddClientDialog />
       </div>
 
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
+            <CardTitle className="text-sm font-medium">Standard Clients</CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalClients}</div>
-            <p className="text-xs text-muted-foreground">All registered clients</p>
+            <div className="text-2xl font-bold">{standardClients.length}</div>
+            <p className="text-xs text-muted-foreground">Project-based engagements</p>
           </CardContent>
         </Card>
         <Card>
@@ -113,7 +112,7 @@ function ClientsPageContent() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600">{activeClients}</div>
-            <p className="text-xs text-muted-foreground">With ongoing engagements</p>
+            <p className="text-xs text-muted-foreground">With ongoing projects</p>
           </CardContent>
         </Card>
         <Card>
@@ -138,11 +137,11 @@ function ClientsPageContent() {
         </Card>
       </div>
 
-      {/* Filters */}
+      {/* Filters and Table */}
       <Card>
         <CardHeader>
           <CardTitle>Client Directory</CardTitle>
-          <CardDescription>View and manage all clients</CardDescription>
+          <CardDescription>View and manage all standard clients</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="mb-4 flex flex-wrap items-center gap-4">
@@ -224,7 +223,7 @@ function ClientsPageContent() {
                       <TableCell>{getTierBadge(client.tier)}</TableCell>
                       <TableCell>
                         {client.status === "prospect" ? (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">-</span>
                         ) : (
                           <span className={cn("font-semibold", getHealthColor(client.healthScore))}>
                             {client.healthScore}%
@@ -235,41 +234,19 @@ function ClientsPageContent() {
                         <Badge variant="outline">{clientProjects.length}</Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex -space-x-2">
-                          {clientTeam.slice(0, 3).map((associate) => (
-                            <div
-                              key={associate.id}
-                              className="h-7 w-7 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-medium"
-                              title={associate.name}
-                            >
-                              {associate.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
-                            </div>
-                          ))}
-                          {clientTeam.length > 3 && (
-                            <div className="h-7 w-7 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs">
-                              +{clientTeam.length - 3}
-                            </div>
-                          )}
-                        </div>
+                        <Badge variant="outline">{clientTeam.length}</Badge>
                       </TableCell>
                       <TableCell>
-                        {client.totalRevenue > 0 ? (
-                          <span className="font-medium">${(client.totalRevenue / 1000).toFixed(0)}K</span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
+                        <span className="font-medium">${(client.revenue || 0).toLocaleString()}</span>
                       </TableCell>
                       <TableCell className="text-right">
                         {primaryContact ? (
                           <div className="text-right">
-                            <p className="font-medium text-sm">{primaryContact.name}</p>
+                            <p className="text-sm font-medium">{primaryContact.name}</p>
                             <p className="text-xs text-muted-foreground">{primaryContact.role}</p>
                           </div>
                         ) : (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
                     </TableRow>

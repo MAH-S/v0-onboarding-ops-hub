@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Search, Moon, Sun, Sparkles } from "lucide-react"
+import { Bell, Search, Moon, Sun, Sparkles, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -25,6 +25,7 @@ import { useAppStore } from "@/lib/store"
 import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { useCopilotStore } from "@/lib/copilot-store"
+import { useAuthStore, ROLE_LABELS } from "@/lib/auth-store"
 
 export function Topbar() {
   const { theme, setTheme } = useTheme()
@@ -33,6 +34,7 @@ export function Topbar() {
   const { projects, associates } = useAppStore()
   const { openCopilot } = useCopilotStore()
   const router = useRouter()
+  const { user, logout, hasPermission, canAccessProject } = useAuthStore()
 
   useEffect(() => {
     setMounted(true)
@@ -48,6 +50,15 @@ export function Topbar() {
     document.addEventListener("keydown", down)
     return () => document.removeEventListener("keydown", down)
   }, [])
+
+  const handleLogout = () => {
+    logout()
+    router.push("/login")
+  }
+
+  const accessibleProjects = projects.filter((project) => canAccessProject(project.ownerId, project.assignedAssociates))
+
+  const accessibleAssociates = hasPermission("associates") ? associates : []
 
   return (
     <>
@@ -110,23 +121,34 @@ export function Topbar() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                 <Avatar className="h-9 w-9">
-                  <AvatarImage src="/manager-avatar.png" alt="Manager" />
-                  <AvatarFallback>MG</AvatarFallback>
+                  <AvatarImage src={user?.avatar || "/placeholder.svg"} alt={user?.name || "User"} />
+                  <AvatarFallback>
+                    {user?.name
+                      ?.split(" ")
+                      .map((n) => n[0])
+                      .join("") || "U"}
+                  </AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">Manager User</p>
-                  <p className="text-xs text-muted-foreground">manager@company.com</p>
+                  <p className="text-sm font-medium">{user?.name || "User"}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                  <Badge variant="secondary" className="w-fit mt-1 text-xs">
+                    {user?.role ? ROLE_LABELS[user.role] : "Unknown Role"}
+                  </Badge>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
+              {hasPermission("settings") && <DropdownMenuItem>Settings</DropdownMenuItem>}
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Log out</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                <LogOut className="h-4 w-4 mr-2" />
+                Log out
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -137,7 +159,7 @@ export function Topbar() {
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
           <CommandGroup heading="Projects">
-            {projects.map((project) => (
+            {accessibleProjects.map((project) => (
               <CommandItem
                 key={project.id}
                 onSelect={() => {
@@ -150,20 +172,22 @@ export function Topbar() {
               </CommandItem>
             ))}
           </CommandGroup>
-          <CommandGroup heading="Associates">
-            {associates.map((associate) => (
-              <CommandItem
-                key={associate.id}
-                onSelect={() => {
-                  router.push(`/associates/${associate.id}`)
-                  setOpen(false)
-                }}
-              >
-                <span>{associate.name}</span>
-                <span className="ml-2 text-xs text-muted-foreground">{associate.role}</span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
+          {accessibleAssociates.length > 0 && (
+            <CommandGroup heading="Associates">
+              {accessibleAssociates.map((associate) => (
+                <CommandItem
+                  key={associate.id}
+                  onSelect={() => {
+                    router.push(`/associates/${associate.id}`)
+                    setOpen(false)
+                  }}
+                >
+                  <span>{associate.name}</span>
+                  <span className="ml-2 text-xs text-muted-foreground">{associate.role}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
         </CommandList>
       </CommandDialog>
     </>

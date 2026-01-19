@@ -27,11 +27,13 @@ import {
   ExternalLink,
   Star,
   Edit,
-  Plus,
   Briefcase,
   CalendarDays,
+  HeartPulse,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { ClientHealthDashboard } from "@/components/clients/client-health-dashboard"
+import { ClientRetainerTab } from "@/components/clients/client-retainer-tab"
 import type { ClientStatus, ClientTier, ProjectHealth } from "@/lib/mock-data"
 
 export default function ClientDetailPage() {
@@ -260,7 +262,19 @@ export default function ClientDetailPage() {
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="projects">Projects ({clientProjects.length})</TabsTrigger>
+          <TabsTrigger value="health" className="flex items-center gap-2">
+            <HeartPulse className="h-4 w-4" />
+            Health
+          </TabsTrigger>
+          {client.clientType === "advisory" && (
+            <TabsTrigger value="retainer" className="flex items-center gap-2">
+              <Briefcase className="h-4 w-4" />
+              Retainer
+            </TabsTrigger>
+          )}
+          {client.clientType !== "advisory" && (
+            <TabsTrigger value="projects">Projects ({clientProjects.length})</TabsTrigger>
+          )}
           <TabsTrigger value="team">Team ({clientTeam.length})</TabsTrigger>
           <TabsTrigger value="contacts">Contacts ({client.contacts.length})</TabsTrigger>
         </TabsList>
@@ -308,8 +322,8 @@ export default function ClientDetailPage() {
                       <div className="flex items-start gap-3">
                         <CalendarDays className="h-4 w-4 text-muted-foreground mt-0.5" />
                         <div>
-                          <p className="text-sm text-muted-foreground">Founded</p>
-                          <p className="font-medium">{client.foundedYear}</p>
+                          <p className="font-medium">Founded</p>
+                          <p className="text-sm text-muted-foreground">{client.foundedYear}</p>
                         </div>
                       </div>
                     )}
@@ -418,74 +432,91 @@ export default function ClientDetailPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="projects" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Projects</CardTitle>
-              <CardDescription>All projects for {client.name}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {clientProjects.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FolderKanban className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No projects yet</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {clientProjects.map((project) => {
-                    const projectTasks = tasks.filter((t) => t.projectId === project.id)
-                    const projectCompletedTasks = projectTasks.filter((t) => t.status === "done").length
-                    const projectAssociates = associates.filter((a) => project.assignedAssociates.includes(a.id))
-
-                    return (
-                      <Link key={project.id} href={`/projects/${project.id}`}>
-                        <div className="p-4 rounded-lg border hover:bg-muted/50 transition-colors">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-semibold hover:underline">{project.name}</h3>
-                                {getProjectHealthBadge(project.health)}
-                                <Badge variant="outline">{project.status}</Badge>
-                              </div>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                Owner: {project.owner} • Due: {formatDate(project.dueDate)}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm font-medium">{project.milestonesProgress}% Complete</p>
-                              <Progress value={project.milestonesProgress} className="h-2 w-32 mt-1" />
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between mt-4">
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                              <span>{project.openTasks} open tasks</span>
-                              <span>•</span>
-                              <span>
-                                {projectCompletedTasks}/{projectTasks.length} tasks done
-                              </span>
-                            </div>
-                            <div className="flex -space-x-2">
-                              {projectAssociates.slice(0, 4).map((associate) => (
-                                <Avatar key={associate.id} className="h-7 w-7 border-2 border-background">
-                                  <AvatarFallback className="text-xs">
-                                    {associate.name
-                                      .split(" ")
-                                      .map((n) => n[0])
-                                      .join("")}
-                                  </AvatarFallback>
-                                </Avatar>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    )
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <TabsContent value="health">
+          <ClientHealthDashboard client={client} />
         </TabsContent>
+
+        {client.clientType === "advisory" && (
+          <TabsContent value="retainer">
+            <ClientRetainerTab client={client} />
+          </TabsContent>
+        )}
+
+        {client.clientType !== "advisory" && (
+          <TabsContent value="projects" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Projects</CardTitle>
+                <CardDescription>All projects for {client.name}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {clientProjects.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FolderKanban className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No projects yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {clientProjects.map((project) => {
+                      const projectTasks = tasks.filter((t) => t.projectId === project.id)
+                      const projectCompletedTasks = projectTasks.filter((t) => t.status === "done").length
+                      const projectAssociates = associates.filter((a) => project.assignedAssociates.includes(a.id))
+
+                      return (
+                        <Link key={project.id} href={`/projects/${project.id}`}>
+                          <div className="p-4 rounded-lg border hover:bg-muted/50 transition-colors">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold hover:underline">{project.name}</h3>
+                                  {getProjectHealthBadge(project.health)}
+                                  <Badge variant="outline">{project.status}</Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  Owner: {project.owner} • Due: {formatDate(project.dueDate)}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-medium">{project.milestonesProgress}% Complete</p>
+                                <Progress value={project.milestonesProgress} className="h-2 w-32 mt-1" />
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between mt-4">
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                <span>{project.openTasks} open tasks</span>
+                                <span>•</span>
+                                <span>
+                                  {projectCompletedTasks}/{projectTasks.length} tasks done
+                                </span>
+                              </div>
+                              <div className="flex -space-x-2">
+                                {projectAssociates.slice(0, 4).map((associate) => (
+                                  <Avatar key={associate.id} className="h-7 w-7 border-2 border-background">
+                                    <AvatarFallback className="text-xs">
+                                      {associate.name
+                                        .split(" ")
+                                        .map((n) => n[0])
+                                        .join("")}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                ))}
+                                {projectAssociates.length > 4 && (
+                                  <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted text-xs">
+                                    +{projectAssociates.length - 4}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         <TabsContent value="team" className="space-y-4">
           <Card>
@@ -520,20 +551,15 @@ export default function ClientDetailPage() {
                                   .join("")}
                               </AvatarFallback>
                             </Avatar>
-                            <div className="flex-1">
-                              <p className="font-semibold hover:underline">{associate.name}</p>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold truncate">{associate.name}</p>
                               <p className="text-sm text-muted-foreground">{associate.role}</p>
                             </div>
-                            <Badge variant="outline">{openTasks} open tasks</Badge>
                           </div>
-                          <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
-                            <span>Working on:</span>
-                            {associateProjects.slice(0, 2).map((p) => (
-                              <Badge key={p.id} variant="secondary" className="text-xs">
-                                {p.name}
-                              </Badge>
-                            ))}
-                            {associateProjects.length > 2 && <span>+{associateProjects.length - 2} more</span>}
+                          <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
+                            <span>{associateProjects.length} projects</span>
+                            <span>•</span>
+                            <span>{openTasks} open tasks</span>
                           </div>
                         </div>
                       </Link>
@@ -547,47 +573,37 @@ export default function ClientDetailPage() {
 
         <TabsContent value="contacts" className="space-y-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Contacts</CardTitle>
-                <CardDescription>All contacts at {client.name}</CardDescription>
-              </div>
-              <Button size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Contact
-              </Button>
+            <CardHeader>
+              <CardTitle>Contacts</CardTitle>
+              <CardDescription>All contacts for {client.name}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2">
                 {client.contacts.map((contact) => (
-                  <div
-                    key={contact.id}
-                    className={cn("p-4 rounded-lg border", contact.isPrimary && "border-amber-500/50 bg-amber-500/5")}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarFallback>
-                            {contact.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-semibold">{contact.name}</p>
-                          <p className="text-sm text-muted-foreground">{contact.role}</p>
+                  <div key={contact.id} className="p-4 rounded-lg border">
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback>
+                          {contact.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold truncate">{contact.name}</p>
+                          {contact.isPrimary && (
+                            <Badge className="bg-amber-600 text-white">
+                              <Star className="h-3 w-3 mr-1" />
+                              Primary
+                            </Badge>
+                          )}
                         </div>
+                        <p className="text-sm text-muted-foreground">{contact.role}</p>
                       </div>
-                      {contact.isPrimary && (
-                        <Badge className="bg-amber-600 text-white">
-                          <Star className="h-3 w-3 mr-1" />
-                          Primary
-                        </Badge>
-                      )}
                     </div>
-                    <Separator className="my-3" />
-                    <div className="space-y-2">
+                    <div className="mt-4 space-y-2">
                       <div className="flex items-center gap-2 text-sm">
                         <Mail className="h-4 w-4 text-muted-foreground" />
                         <a href={`mailto:${contact.email}`} className="hover:underline">

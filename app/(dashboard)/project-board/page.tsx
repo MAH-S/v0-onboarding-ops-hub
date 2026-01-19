@@ -32,7 +32,7 @@ import {
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
+  rectIntersection,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -40,6 +40,7 @@ import {
   useDroppable,
   type DragEndEvent,
   type DragStartEvent,
+  type DragOverEvent,
 } from "@dnd-kit/core"
 import {
   SortableContext,
@@ -51,20 +52,19 @@ import { CSS } from "@dnd-kit/utilities"
 import { toast } from "sonner"
 import { format } from "date-fns"
 
-const LIFECYCLE_COLUMNS: { id: ProjectLifecycle | "completed"; title: string; icon: React.ReactNode; color: string }[] =
-  [
-    { id: "new-business", title: "New Business", icon: <Sparkles className="h-4 w-4" />, color: "bg-blue-500" },
-    { id: "onboarding", title: "Onboarding", icon: <Briefcase className="h-4 w-4" />, color: "bg-purple-500" },
-    { id: "execution", title: "Execution", icon: <TrendingUp className="h-4 w-4" />, color: "bg-amber-500" },
-    { id: "closure", title: "Closure", icon: <FileCheck className="h-4 w-4" />, color: "bg-emerald-500" },
-    { id: "learnings", title: "Learnings", icon: <GraduationCap className="h-4 w-4" />, color: "bg-slate-500" },
-    {
-      id: "completed",
-      title: "Completed",
-      icon: <Trophy className="h-4 w-4" />,
-      color: "bg-gradient-to-r from-yellow-500 to-amber-500",
-    },
-  ]
+const LIFECYCLE_COLUMNS: { id: ProjectLifecycle; title: string; icon: React.ReactNode; color: string }[] = [
+  { id: "new-business", title: "New Business", icon: <Sparkles className="h-4 w-4" />, color: "bg-blue-500" },
+  { id: "onboarding", title: "Onboarding", icon: <Briefcase className="h-4 w-4" />, color: "bg-purple-500" },
+  { id: "execution", title: "Execution", icon: <TrendingUp className="h-4 w-4" />, color: "bg-amber-500" },
+  { id: "closure", title: "Closure", icon: <FileCheck className="h-4 w-4" />, color: "bg-emerald-500" },
+  { id: "learnings", title: "Learnings", icon: <GraduationCap className="h-4 w-4" />, color: "bg-slate-500" },
+  {
+    id: "completed" as ProjectLifecycle,
+    title: "Completed",
+    icon: <Trophy className="h-4 w-4" />,
+    color: "bg-gradient-to-r from-yellow-500 to-amber-500",
+  },
+]
 
 function Confetti({ isActive }: { isActive: boolean }) {
   const [particles, setParticles] = useState<
@@ -339,6 +339,7 @@ function SortableProjectCard({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1000 : 1,
   }
 
   return (
@@ -352,51 +353,61 @@ function DroppableColumn({
   column,
   projects,
   associates,
+  isActiveDropZone,
 }: {
   column: (typeof LIFECYCLE_COLUMNS)[0]
   projects: Project[]
   associates: ReturnType<typeof useAppStore>["associates"]
+  isActiveDropZone: boolean
 }) {
   const { setNodeRef, isOver } = useDroppable({
-    id: column.id,
+    id: `column-${column.id}`,
   })
 
   const isCompleted = column.id === "completed"
+  const showDropIndicator = isOver || isActiveDropZone
 
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col rounded-lg bg-muted/50 transition-colors min-w-[280px] max-w-[320px] flex-1 ${
-        isOver ? "bg-primary/10 ring-2 ring-primary/50" : ""
-      } ${isCompleted ? "ring-2 ring-yellow-500/30" : ""}`}
+      className={`flex flex-col rounded-lg bg-muted/50 transition-all duration-200 min-w-[280px] max-w-[320px] flex-1 ${
+        showDropIndicator ? "bg-primary/10 ring-2 ring-primary scale-[1.02]" : ""
+      } ${isCompleted && !showDropIndicator ? "ring-2 ring-yellow-500/30" : ""}`}
     >
-      <div className={`p-3 rounded-t-lg ${column.color}`}>
+      <div className={`p-3 rounded-t-lg ${column.color} ${showDropIndicator ? "opacity-90" : ""}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-white">
             {column.icon}
             <h3 className="font-semibold text-sm">{column.title}</h3>
-            {isCompleted && <span className="text-lg">🎉</span>}
           </div>
           <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30 border-0">
             {projects.length}
           </Badge>
         </div>
       </div>
-      <div className="p-2 flex-1 overflow-y-auto">
+      <div className="p-2 flex-1 overflow-y-auto min-h-[400px]">
         <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-2 min-h-[300px]">
+          <div className="space-y-2 h-full">
             {projects.map((project) => (
               <SortableProjectCard key={project.id} project={project} associates={associates} />
             ))}
-            {projects.length === 0 && (
-              <div
-                className={`flex h-[200px] items-center justify-center rounded-lg border-2 border-dashed ${isCompleted ? "border-yellow-500/50" : ""}`}
-              >
-                <p className="text-sm text-muted-foreground">
-                  {isCompleted ? "Drop completed projects here" : "Drop projects here"}
-                </p>
-              </div>
-            )}
+            <div
+              className={`flex items-center justify-center rounded-lg border-2 border-dashed transition-all duration-200 ${
+                showDropIndicator
+                  ? "border-primary bg-primary/5 h-24"
+                  : projects.length === 0
+                    ? "h-[200px]"
+                    : "h-16 opacity-0 hover:opacity-50"
+              } ${isCompleted && !showDropIndicator ? "border-yellow-500/50" : ""}`}
+            >
+              <p className={`text-sm text-muted-foreground ${showDropIndicator ? "font-medium text-primary" : ""}`}>
+                {showDropIndicator
+                  ? `Drop here to move to ${column.title}`
+                  : isCompleted
+                    ? "Drop completed projects here"
+                    : "Drop projects here"}
+              </p>
+            </div>
           </div>
         </SortableContext>
       </div>
@@ -410,11 +421,18 @@ export default function ProjectBoardPage() {
   const [showConfetti, setShowConfetti] = useState(false)
   const [showCelebration, setShowCelebration] = useState(false)
   const [completedProjectName, setCompletedProjectName] = useState("")
+  const [activeDropColumn, setActiveDropColumn] = useState<string | null>(null)
+
+  const [localProjects, setLocalProjects] = useState<Project[]>(projects)
+
+  useEffect(() => {
+    setLocalProjects(projects)
+  }, [projects])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -437,59 +455,81 @@ export default function ProjectBoardPage() {
   }, [])
 
   const handleDragStart = (event: DragStartEvent) => {
-    const project = projects.find((p) => p.id === event.active.id)
+    const project = localProjects.find((p) => p.id === event.active.id)
     setActiveProject(project || null)
+  }
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event
+
+    if (!over) {
+      setActiveDropColumn(null)
+      return
+    }
+
+    const overId = over.id as string
+
+    if (overId.startsWith("column-")) {
+      setActiveDropColumn(overId.replace("column-", ""))
+    } else {
+      const overProject = localProjects.find((p) => p.id === overId)
+      if (overProject) {
+        setActiveDropColumn(overProject.lifecycle)
+      }
+    }
   }
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     setActiveProject(null)
+    setActiveDropColumn(null)
 
     if (!over) return
 
     const projectId = active.id as string
     const overId = over.id as string
 
-    const columnIds = LIFECYCLE_COLUMNS.map((c) => c.id)
-    if (columnIds.includes(overId as ProjectLifecycle | "completed")) {
-      const currentProject = projects.find((p) => p.id === projectId)
-      if (currentProject && currentProject.lifecycle !== overId) {
-        if (overId === "completed") {
-          updateProjectLifecycle(projectId, "completed" as ProjectLifecycle)
-          triggerCelebration(currentProject.name)
-        } else {
-          updateProjectLifecycle(projectId, overId as ProjectLifecycle)
-          const columnTitle = LIFECYCLE_COLUMNS.find((c) => c.id === overId)?.title
-          toast.success(`Project moved to ${columnTitle}`)
-        }
+    const currentProject = localProjects.find((p) => p.id === projectId)
+    if (!currentProject) return
+
+    let targetLifecycle: ProjectLifecycle | null = null
+
+    if (overId.startsWith("column-")) {
+      targetLifecycle = overId.replace("column-", "") as ProjectLifecycle
+    } else {
+      const overProject = localProjects.find((p) => p.id === overId)
+      if (overProject) {
+        targetLifecycle = overProject.lifecycle
       }
-      return
     }
 
-    const overProject = projects.find((p) => p.id === overId)
-    if (overProject) {
-      const currentProject = projects.find((p) => p.id === projectId)
-      if (currentProject && currentProject.lifecycle !== overProject.lifecycle) {
-        if (overProject.lifecycle === "completed") {
-          updateProjectLifecycle(projectId, "completed" as ProjectLifecycle)
-          triggerCelebration(currentProject.name)
-        } else {
-          updateProjectLifecycle(projectId, overProject.lifecycle)
-          const columnTitle = LIFECYCLE_COLUMNS.find((c) => c.id === overProject.lifecycle)?.title
-          toast.success(`Project moved to ${columnTitle}`)
-        }
+    if (targetLifecycle && currentProject.lifecycle !== targetLifecycle) {
+      setLocalProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, lifecycle: targetLifecycle } : p)))
+
+      updateProjectLifecycle(projectId, targetLifecycle)
+
+      if (targetLifecycle === "completed") {
+        triggerCelebration(currentProject.name)
+      } else {
+        const columnTitle = LIFECYCLE_COLUMNS.find((c) => c.id === targetLifecycle)?.title
+        toast.success(`Project moved to ${columnTitle}`)
       }
     }
   }
 
+  const handleDragCancel = () => {
+    setActiveProject(null)
+    setActiveDropColumn(null)
+  }
+
   const projectsByLifecycle = LIFECYCLE_COLUMNS.map((column) => ({
     ...column,
-    projects: projects.filter((p) => p.lifecycle === column.id),
+    projects: localProjects.filter((p) => p.lifecycle === column.id),
   }))
 
-  const totalProjects = projects.length
-  const atRiskProjects = projects.filter((p) => p.health === "at-risk" || p.health === "critical-risk").length
-  const completedProjects = projects.filter((p) => p.lifecycle === "completed").length
+  const totalProjects = localProjects.length
+  const atRiskProjects = localProjects.filter((p) => p.health === "at-risk" || p.health === "critical-risk").length
+  const completedProjects = localProjects.filter((p) => p.lifecycle === "completed").length
 
   return (
     <div className="space-y-6">
@@ -535,13 +575,21 @@ export default function ProjectBoardPage() {
         <CardContent>
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCorners}
+            collisionDetection={rectIntersection}
             onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
           >
             <div className="flex gap-4 overflow-x-auto pb-4">
               {projectsByLifecycle.map((column) => (
-                <DroppableColumn key={column.id} column={column} projects={column.projects} associates={associates} />
+                <DroppableColumn
+                  key={column.id}
+                  column={column}
+                  projects={column.projects}
+                  associates={associates}
+                  isActiveDropZone={activeDropColumn === column.id}
+                />
               ))}
             </div>
             <DragOverlay>

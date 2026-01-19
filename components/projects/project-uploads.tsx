@@ -19,16 +19,18 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAppStore } from "@/lib/store"
 import { Upload, FileText, Eye, MessageSquare } from "lucide-react"
 import { toast } from "sonner"
+import Link from "next/link"
 
 interface ProjectUploadsProps {
   projectId: string
 }
 
 export function ProjectUploads({ projectId }: ProjectUploadsProps) {
-  const { uploads, addUpload, updateUpload } = useAppStore()
+  const { uploads, associates, addUpload, updateUpload } = useAppStore()
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false)
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
@@ -39,7 +41,7 @@ export function ProjectUploads({ projectId }: ProjectUploadsProps) {
   const [newUpload, setNewUpload] = useState({
     fileName: "",
     type: "Quote" as "Quote" | "Invoice",
-    vendor: "",
+    associateId: "",
     amount: "",
     currency: "USD",
   })
@@ -57,16 +59,19 @@ export function ProjectUploads({ projectId }: ProjectUploadsProps) {
   }, [])
 
   const handleUpload = () => {
-    if (!newUpload.fileName || !newUpload.vendor || !newUpload.amount) {
+    if (!newUpload.fileName || !newUpload.associateId || !newUpload.amount) {
       toast.error("Please fill in all required fields")
       return
     }
+
+    const selectedAssociate = associates.find((a) => a.id === newUpload.associateId)
 
     addUpload({
       id: `u${Date.now()}`,
       fileName: newUpload.fileName,
       type: newUpload.type,
-      vendor: newUpload.vendor,
+      associate: selectedAssociate?.name || "",
+      associateId: newUpload.associateId,
       amount: Number.parseFloat(newUpload.amount),
       currency: newUpload.currency,
       date: new Date().toISOString().split("T")[0],
@@ -76,7 +81,7 @@ export function ProjectUploads({ projectId }: ProjectUploadsProps) {
       projectId,
     })
 
-    setNewUpload({ fileName: "", type: "Quote", vendor: "", amount: "", currency: "USD" })
+    setNewUpload({ fileName: "", type: "Quote", associateId: "", amount: "", currency: "USD" })
     setUploadDialogOpen(false)
     toast.success("File uploaded successfully")
   }
@@ -149,12 +154,33 @@ export function ProjectUploads({ projectId }: ProjectUploadsProps) {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Vendor</Label>
-                  <Input
-                    value={newUpload.vendor}
-                    onChange={(e) => setNewUpload({ ...newUpload, vendor: e.target.value })}
-                    placeholder="Vendor name"
-                  />
+                  <Label>Associate</Label>
+                  <Select
+                    value={newUpload.associateId}
+                    onValueChange={(v) => setNewUpload({ ...newUpload, associateId: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select associate" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {associates.map((associate) => (
+                        <SelectItem key={associate.id} value={associate.id}>
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-5 w-5">
+                              <AvatarImage src={associate.avatar || "/placeholder.svg"} />
+                              <AvatarFallback className="text-xs">
+                                {associate.name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")}
+                              </AvatarFallback>
+                            </Avatar>
+                            {associate.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -213,7 +239,7 @@ export function ProjectUploads({ projectId }: ProjectUploadsProps) {
               <TableRow>
                 <TableHead>File Name</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Vendor</TableHead>
+                <TableHead>Associate</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Uploaded By</TableHead>
@@ -222,83 +248,103 @@ export function ProjectUploads({ projectId }: ProjectUploadsProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {projectUploads.map((upload) => (
-                <TableRow key={upload.id}>
-                  <TableCell className="font-medium">{upload.fileName}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{upload.type}</Badge>
-                  </TableCell>
-                  <TableCell>{upload.vendor}</TableCell>
-                  <TableCell className="text-right">
-                    {upload.currency} {upload.amount.toLocaleString()}
-                  </TableCell>
-                  <TableCell>{upload.date}</TableCell>
-                  <TableCell>{upload.uploadedBy}</TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusVariant(upload.status)}>{upload.status}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
-                          <DialogHeader>
-                            <DialogTitle>Preview: {upload.fileName}</DialogTitle>
-                          </DialogHeader>
-                          <div className="flex h-96 items-center justify-center rounded-lg border bg-muted">
-                            <p className="text-muted-foreground">Preview not available (Prototype)</p>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                      <Dialog
-                        open={reviewDialogOpen && selectedUpload === upload.id}
-                        onOpenChange={(open) => {
-                          setReviewDialogOpen(open)
-                          if (open) setSelectedUpload(upload.id)
-                        }}
-                      >
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => setSelectedUpload(upload.id)}
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Add Review Note</DialogTitle>
-                            <DialogDescription>Add a note for this document</DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4 py-4">
-                            {upload.reviewNote && (
-                              <div className="rounded-lg bg-muted p-3">
-                                <p className="text-xs text-muted-foreground mb-1">Current note:</p>
-                                <p className="text-sm">{upload.reviewNote}</p>
-                              </div>
-                            )}
-                            <Textarea
-                              value={reviewNote}
-                              onChange={(e) => setReviewNote(e.target.value)}
-                              placeholder="Enter review note..."
-                              rows={3}
-                            />
-                            <Button onClick={handleAddReviewNote} className="w-full">
-                              Save Note
+              {projectUploads.map((upload) => {
+                const associate = associates.find((a) => a.id === upload.associateId)
+                return (
+                  <TableRow key={upload.id}>
+                    <TableCell className="font-medium">{upload.fileName}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{upload.type}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {associate ? (
+                        <Link href={`/associates/${associate.id}`} className="flex items-center gap-2 hover:underline">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={associate.avatar || "/placeholder.svg"} />
+                            <AvatarFallback className="text-xs">
+                              {associate.name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span>{associate.name}</span>
+                        </Link>
+                      ) : (
+                        upload.associate || "-"
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {upload.currency} {upload.amount.toLocaleString()}
+                    </TableCell>
+                    <TableCell>{upload.date}</TableCell>
+                    <TableCell>{upload.uploadedBy}</TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusVariant(upload.status)}>{upload.status}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Eye className="h-4 w-4" />
                             </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                          </DialogTrigger>
+                          <DialogContent className="max-w-2xl">
+                            <DialogHeader>
+                              <DialogTitle>Preview: {upload.fileName}</DialogTitle>
+                            </DialogHeader>
+                            <div className="flex h-96 items-center justify-center rounded-lg border bg-muted">
+                              <p className="text-muted-foreground">Preview not available (Prototype)</p>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                        <Dialog
+                          open={reviewDialogOpen && selectedUpload === upload.id}
+                          onOpenChange={(open) => {
+                            setReviewDialogOpen(open)
+                            if (open) setSelectedUpload(upload.id)
+                          }}
+                        >
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => setSelectedUpload(upload.id)}
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Add Review Note</DialogTitle>
+                              <DialogDescription>Add a note for this document</DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              {upload.reviewNote && (
+                                <div className="rounded-lg bg-muted p-3">
+                                  <p className="mb-1 text-xs text-muted-foreground">Current note:</p>
+                                  <p className="text-sm">{upload.reviewNote}</p>
+                                </div>
+                              )}
+                              <Textarea
+                                value={reviewNote}
+                                onChange={(e) => setReviewNote(e.target.value)}
+                                placeholder="Enter review note..."
+                                rows={3}
+                              />
+                              <Button onClick={handleAddReviewNote} className="w-full">
+                                Save Note
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         ) : (

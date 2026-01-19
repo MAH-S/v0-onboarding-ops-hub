@@ -4,6 +4,7 @@ export type FinanceReadiness = "quote" | "invoice" | "overdue" | "paid"
 
 export type ClientStatus = "active" | "prospect" | "inactive" | "churned"
 export type ClientTier = "enterprise" | "mid-market" | "startup"
+export type ClientType = "standard" | "advisory"
 
 export interface ClientContact {
   id: string
@@ -12,6 +13,22 @@ export interface ClientContact {
   email: string
   phone?: string
   isPrimary: boolean
+}
+
+export interface ClientHealthFactor {
+  factor: string
+  score: number // 0-100
+  weight: number // 0-1, sum of all weights = 1
+  description: string
+}
+
+export interface ClientHealthHistoryEntry {
+  date: string
+  score: number
+  factors: ClientHealthFactor[]
+  note?: string
+  updatedBy?: string
+  isManualOverride?: boolean
 }
 
 export interface Client {
@@ -24,6 +41,7 @@ export interface Client {
   foundedYear?: number
   status: ClientStatus
   tier: ClientTier
+  clientType: ClientType
   website?: string
   description: string
   address: {
@@ -39,25 +57,25 @@ export interface Client {
   totalRevenue: number
   outstandingBalance: number
   healthScore: number // 0-100
+  healthOverride?: number | null // Manual override, null means auto-calculate
+  healthFactors?: ClientHealthFactor[]
+  healthHistory?: ClientHealthHistoryEntry[]
+  healthNotes?: string
+  healthAlerts?: string[]
   notes: string
   tags: string[]
   createdAt: string
+  retainer?: {
+    monthlyFee: number
+    startDate: string
+    endDate?: string
+    hoursIncluded: number
+    hoursUsed: number
+    services: string[]
+    advisorId?: string
+    status: "active" | "paused" | "expired"
+  }
 }
-
-export const ONBOARDING_STEPS = [
-  { step: 1, label: "Win Communication" },
-  { step: 2, label: "Internal Processes (PC, QB, Monday etc.)" },
-  { step: 3, label: "Engagement Lead Briefing (Incl Technical Proposal)" },
-  { step: 4, label: "Resourcing Review & Refinement" },
-  { step: 5, label: "Project Team Briefing (Incl Technical Proposal)" },
-  { step: 6, label: "Partner Briefing" },
-  { step: 7, label: "ASOW Generation" },
-  { step: 8, label: "Client Logistics (Hotel, Office Space)" },
-  { step: 9, label: "Expense Budget Allocation to EL" },
-  { step: 10, label: "Client Briefing" },
-  { step: 11, label: "Project Plan & Risk Register" },
-  { step: 12, label: "Project/Client Mobilization" },
-] as const
 
 export interface Project {
   id: string
@@ -67,6 +85,10 @@ export interface Project {
   lifecycle: ProjectLifecycle
   health: ProjectHealth
   onboardingStep?: number
+  newBusinessStep?: number
+  executionStep?: number
+  closureStep?: number
+  learningsStep?: number
   owner: string
   ownerId: string
   nextAction: string
@@ -161,7 +183,8 @@ export interface Upload {
   id: string
   fileName: string
   type: "Quote" | "Invoice"
-  vendor: string
+  associate: string
+  associateId: string
   amount: number
   currency: string
   date: string
@@ -195,6 +218,110 @@ export interface CostingRequest {
   requestedById: string
   createdAt: string
 }
+
+export const ONBOARDING_STEPS = [
+  { step: 1, label: "Win Communication" },
+  { step: 2, label: "Internal Processes (PC, QB, Monday etc.)" },
+  { step: 3, label: "Engagement Lead Briefing (Incl Technical Proposal)" },
+  { step: 4, label: "Resourcing Review & Refinement" },
+  { step: 5, label: "Project Team Briefing (Incl Technical Proposal)" },
+  { step: 6, label: "Partner Briefing" },
+  { step: 7, label: "ASOW Generation" },
+  { step: 8, label: "Client Logistics (Hotel, Office Space)" },
+  { step: 9, label: "Expense Budget Allocation to EL" },
+  { step: 10, label: "Client Briefing" },
+  { step: 11, label: "Project Plan & Risk Register" },
+  { step: 12, label: "Project/Client Mobilization" },
+] as const
+
+export const NEW_BUSINESS_STEPS = [
+  { step: 1, label: "Lead Generated" },
+  { step: 2, label: "Opportunity Evaluation" },
+  { step: 3, label: "Emica Bidding Decision" },
+  { step: 4, label: "Bid Team Assembled & Briefed" },
+  { step: 5, label: "Solution Architecture" },
+  { step: 6, label: "Technical Bid Preparation" },
+  { step: 7, label: "Commercial Bid Preparation" },
+  { step: 8, label: "Commercial Bid Sign Off" },
+  { step: 9, label: "Technical Bid Sign Off" },
+  { step: 10, label: "Bid Submission" },
+  { step: 11, label: "Bid Pitch" },
+  { step: 12, label: "Commercial Negotiations" },
+] as const
+
+export const EXECUTION_STEPS = [
+  { step: 1, label: "Project Kickoff" },
+  { step: 2, label: "Requirements Finalization" },
+  { step: 3, label: "Design Phase" },
+  { step: 4, label: "Development Sprint 1" },
+  { step: 5, label: "Development Sprint 2" },
+  { step: 6, label: "Development Sprint 3" },
+  { step: 7, label: "Integration Testing" },
+  { step: 8, label: "User Acceptance Testing" },
+  { step: 9, label: "Bug Fixes & Refinement" },
+  { step: 10, label: "Final Review" },
+  { step: 11, label: "Go-Live Preparation" },
+  { step: 12, label: "Go-Live & Handover" },
+] as const
+
+export const CLOSURE_STEPS = [
+  { step: 1, label: "Project Completion Sign-off" },
+  { step: 2, label: "Final Deliverables Handover" },
+  { step: 3, label: "Knowledge Transfer" },
+  { step: 4, label: "Documentation Finalization" },
+  { step: 5, label: "Final Invoice Generation" },
+  { step: 6, label: "Payment Collection" },
+  { step: 7, label: "Client Satisfaction Survey" },
+  { step: 8, label: "Internal Retrospective" },
+  { step: 9, label: "Resource Release" },
+  { step: 10, label: "Archive Project Files" },
+] as const
+
+export const LEARNINGS_STEPS = [
+  { step: 1, label: "Lessons Learned Workshop" },
+  { step: 2, label: "Success Factors Documentation" },
+  { step: 3, label: "Challenge Analysis" },
+  { step: 4, label: "Process Improvement Recommendations" },
+  { step: 5, label: "Best Practices Update" },
+  { step: 6, label: "Team Feedback Collection" },
+  { step: 7, label: "Client Testimonial Request" },
+  { step: 8, label: "Case Study Creation" },
+  { step: 9, label: "Knowledge Base Update" },
+  { step: 10, label: "Final Archive & Close" },
+] as const
+
+export const PIPELINE_CONFIG = {
+  "new-business": {
+    name: "New Business Acquisition",
+    steps: NEW_BUSINESS_STEPS,
+    stepField: "newBusinessStep" as const,
+  },
+  onboarding: {
+    name: "Project Onboarding",
+    steps: ONBOARDING_STEPS,
+    stepField: "onboardingStep" as const,
+  },
+  execution: {
+    name: "Project Execution",
+    steps: EXECUTION_STEPS,
+    stepField: "executionStep" as const,
+  },
+  closure: {
+    name: "Project Closure",
+    steps: CLOSURE_STEPS,
+    stepField: "closureStep" as const,
+  },
+  learnings: {
+    name: "Project Learnings",
+    steps: LEARNINGS_STEPS,
+    stepField: "learningsStep" as const,
+  },
+  completed: {
+    name: "Completed",
+    steps: [],
+    stepField: null,
+  },
+} as const
 
 export const associates: Associate[] = [
   {
@@ -510,19 +637,449 @@ export const associates: Associate[] = [
     timeOff: [{ startDate: "2026-03-01", endDate: "2026-03-07", type: "vacation", approved: true }],
     notes: "Team lead for implementation. Available for escalations and mentoring.",
   },
+  {
+    id: "a5",
+    name: "Aisha Patel",
+    email: "aisha.patel@company.com",
+    avatar: "/professional-woman-avatar-2.png",
+    role: "Associate",
+    activeProjects: 3,
+    openTasks: 7,
+    milestonesOverdue: 0,
+    avgCycleTime: 2.0,
+    performanceScore: 86,
+    tasksCompletedHistory: [{ date: "2026-01-05", count: 9 }],
+    cycleTimeHistory: [{ date: "2026-01-05", time: 2.0 }],
+    approvalTurnaroundHistory: [{ date: "2026-01-05", time: 1.1 }],
+    topDelayReasons: ["Awaiting client approval"],
+    phone: "+1 (555) 567-8901",
+    department: "Client Services",
+    location: "Austin, TX",
+    startDate: "2023-09-15",
+    manager: "David Kim",
+    managerId: "a4",
+    bio: "Detail-oriented associate with strong analytical skills.",
+    strengths: ["Data Analysis", "Process Documentation", "Quality Assurance"],
+    skills: [
+      { name: "Excel", level: "expert", yearsExp: 5 },
+      { name: "SQL", level: "advanced", yearsExp: 3 },
+      { name: "Tableau", level: "intermediate", yearsExp: 2 },
+    ],
+    certifications: [],
+    languages: [
+      { language: "English", proficiency: "native" },
+      { language: "Hindi", proficiency: "fluent" },
+    ],
+    availability: "available",
+    maxCapacity: 4,
+    schedule: [
+      { dayOfWeek: "monday", startTime: "09:00", endTime: "17:00", type: "office" },
+      { dayOfWeek: "tuesday", startTime: "09:00", endTime: "17:00", type: "remote" },
+      { dayOfWeek: "wednesday", startTime: "09:00", endTime: "17:00", type: "office" },
+      { dayOfWeek: "thursday", startTime: "09:00", endTime: "17:00", type: "remote" },
+      { dayOfWeek: "friday", startTime: "09:00", endTime: "16:00", type: "remote" },
+    ],
+    timeOff: [],
+  },
+  {
+    id: "a6",
+    name: "James Wilson",
+    email: "james.wilson@company.com",
+    avatar: "/professional-man-avatar-2.png",
+    role: "Senior Associate",
+    activeProjects: 4,
+    openTasks: 11,
+    milestonesOverdue: 1,
+    avgCycleTime: 2.2,
+    performanceScore: 89,
+    tasksCompletedHistory: [{ date: "2026-01-05", count: 12 }],
+    cycleTimeHistory: [{ date: "2026-01-05", time: 2.2 }],
+    approvalTurnaroundHistory: [{ date: "2026-01-05", time: 0.9 }],
+    topDelayReasons: ["Technical complexity"],
+    phone: "+1 (555) 678-9012",
+    department: "Technical Solutions",
+    location: "Seattle, WA",
+    startDate: "2021-04-01",
+    manager: "David Kim",
+    managerId: "a4",
+    bio: "Technical expert specializing in cloud architecture and integrations.",
+    strengths: ["Cloud Architecture", "System Design", "Technical Leadership"],
+    skills: [
+      { name: "AWS", level: "expert", yearsExp: 6 },
+      { name: "Azure", level: "advanced", yearsExp: 4 },
+      { name: "Python", level: "expert", yearsExp: 7 },
+    ],
+    certifications: [
+      { name: "AWS Solutions Architect Professional", issuer: "Amazon", date: "2023-05-10" },
+    ],
+    languages: [{ language: "English", proficiency: "native" }],
+    availability: "available",
+    maxCapacity: 5,
+    schedule: [
+      { dayOfWeek: "monday", startTime: "08:00", endTime: "17:00", type: "office" },
+      { dayOfWeek: "tuesday", startTime: "08:00", endTime: "17:00", type: "office" },
+      { dayOfWeek: "wednesday", startTime: "08:00", endTime: "17:00", type: "remote" },
+      { dayOfWeek: "thursday", startTime: "08:00", endTime: "17:00", type: "office" },
+      { dayOfWeek: "friday", startTime: "08:00", endTime: "16:00", type: "remote" },
+    ],
+    timeOff: [],
+  },
+  {
+    id: "a7",
+    name: "Fatima Al-Hassan",
+    email: "fatima.h@company.com",
+    avatar: "/professional-woman-avatar-3.png",
+    role: "Associate",
+    activeProjects: 2,
+    openTasks: 6,
+    milestonesOverdue: 0,
+    avgCycleTime: 1.9,
+    performanceScore: 84,
+    tasksCompletedHistory: [{ date: "2026-01-05", count: 8 }],
+    cycleTimeHistory: [{ date: "2026-01-05", time: 1.9 }],
+    approvalTurnaroundHistory: [{ date: "2026-01-05", time: 1.2 }],
+    topDelayReasons: [],
+    phone: "+971 50 123 4567",
+    department: "Implementation",
+    location: "Dubai, UAE",
+    startDate: "2024-02-01",
+    bio: "Implementation specialist with regional expertise in Middle East markets.",
+    strengths: ["Regional Knowledge", "Arabic Support", "Client Relations"],
+    skills: [
+      { name: "Project Coordination", level: "advanced", yearsExp: 4 },
+      { name: "Stakeholder Management", level: "advanced", yearsExp: 3 },
+    ],
+    certifications: [],
+    languages: [
+      { language: "English", proficiency: "fluent" },
+      { language: "Arabic", proficiency: "native" },
+    ],
+    availability: "available",
+    maxCapacity: 3,
+    schedule: [
+      { dayOfWeek: "sunday", startTime: "09:00", endTime: "17:00", type: "office" },
+      { dayOfWeek: "monday", startTime: "09:00", endTime: "17:00", type: "office" },
+      { dayOfWeek: "tuesday", startTime: "09:00", endTime: "17:00", type: "office" },
+      { dayOfWeek: "wednesday", startTime: "09:00", endTime: "17:00", type: "office" },
+      { dayOfWeek: "thursday", startTime: "09:00", endTime: "17:00", type: "office" },
+    ],
+    timeOff: [],
+  },
+  {
+    id: "a8",
+    name: "Carlos Mendez",
+    email: "carlos.m@company.com",
+    avatar: "/professional-man-avatar-3.png",
+    role: "Associate",
+    activeProjects: 3,
+    openTasks: 9,
+    milestonesOverdue: 1,
+    avgCycleTime: 2.4,
+    performanceScore: 81,
+    tasksCompletedHistory: [{ date: "2026-01-05", count: 7 }],
+    cycleTimeHistory: [{ date: "2026-01-05", time: 2.4 }],
+    approvalTurnaroundHistory: [{ date: "2026-01-05", time: 1.4 }],
+    topDelayReasons: ["Resource constraints"],
+    phone: "+52 55 1234 5678",
+    department: "Client Services",
+    location: "Mexico City, MX",
+    startDate: "2023-11-01",
+    bio: "Bilingual associate supporting LATAM region clients.",
+    strengths: ["Bilingual Support", "Client Communication", "Training"],
+    skills: [
+      { name: "Client Relations", level: "advanced", yearsExp: 4 },
+      { name: "Training Delivery", level: "intermediate", yearsExp: 2 },
+    ],
+    certifications: [],
+    languages: [
+      { language: "Spanish", proficiency: "native" },
+      { language: "English", proficiency: "fluent" },
+    ],
+    availability: "available",
+    maxCapacity: 4,
+    schedule: [
+      { dayOfWeek: "monday", startTime: "09:00", endTime: "18:00", type: "office" },
+      { dayOfWeek: "tuesday", startTime: "09:00", endTime: "18:00", type: "office" },
+      { dayOfWeek: "wednesday", startTime: "09:00", endTime: "18:00", type: "remote" },
+      { dayOfWeek: "thursday", startTime: "09:00", endTime: "18:00", type: "office" },
+      { dayOfWeek: "friday", startTime: "09:00", endTime: "16:00", type: "remote" },
+    ],
+    timeOff: [],
+  },
+  {
+    id: "a9",
+    name: "Priya Sharma",
+    email: "priya.sharma@company.com",
+    avatar: "/professional-woman-avatar-4.png",
+    role: "Senior Associate",
+    activeProjects: 4,
+    openTasks: 10,
+    milestonesOverdue: 0,
+    avgCycleTime: 1.7,
+    performanceScore: 91,
+    tasksCompletedHistory: [{ date: "2026-01-05", count: 13 }],
+    cycleTimeHistory: [{ date: "2026-01-05", time: 1.7 }],
+    approvalTurnaroundHistory: [{ date: "2026-01-05", time: 0.8 }],
+    topDelayReasons: [],
+    phone: "+91 98765 43210",
+    department: "Implementation",
+    location: "Bangalore, IN",
+    startDate: "2022-01-15",
+    bio: "High-performing senior associate with expertise in data migrations.",
+    strengths: ["Data Migration", "ETL", "Quality Assurance", "Technical Documentation"],
+    skills: [
+      { name: "SQL", level: "expert", yearsExp: 6 },
+      { name: "Python", level: "advanced", yearsExp: 4 },
+      { name: "ETL Tools", level: "expert", yearsExp: 5 },
+    ],
+    certifications: [
+      { name: "Google Cloud Professional Data Engineer", issuer: "Google", date: "2024-01-15" },
+    ],
+    languages: [
+      { language: "English", proficiency: "fluent" },
+      { language: "Hindi", proficiency: "native" },
+      { language: "Kannada", proficiency: "native" },
+    ],
+    availability: "available",
+    maxCapacity: 5,
+    schedule: [
+      { dayOfWeek: "monday", startTime: "10:00", endTime: "19:00", type: "office" },
+      { dayOfWeek: "tuesday", startTime: "10:00", endTime: "19:00", type: "office" },
+      { dayOfWeek: "wednesday", startTime: "10:00", endTime: "19:00", type: "remote" },
+      { dayOfWeek: "thursday", startTime: "10:00", endTime: "19:00", type: "office" },
+      { dayOfWeek: "friday", startTime: "10:00", endTime: "18:00", type: "remote" },
+    ],
+    timeOff: [],
+  },
+  {
+    id: "a10",
+    name: "Michael O'Brien",
+    email: "michael.ob@company.com",
+    avatar: "/professional-man-avatar-4.png",
+    role: "Associate",
+    activeProjects: 2,
+    openTasks: 5,
+    milestonesOverdue: 0,
+    avgCycleTime: 2.1,
+    performanceScore: 83,
+    tasksCompletedHistory: [{ date: "2026-01-05", count: 6 }],
+    cycleTimeHistory: [{ date: "2026-01-05", time: 2.1 }],
+    approvalTurnaroundHistory: [{ date: "2026-01-05", time: 1.3 }],
+    topDelayReasons: ["Client availability"],
+    phone: "+353 1 234 5678",
+    department: "Client Services",
+    location: "Dublin, IE",
+    startDate: "2024-06-01",
+    bio: "Associate supporting European clients with strong finance background.",
+    strengths: ["Financial Analysis", "Reporting", "EMEA Knowledge"],
+    skills: [
+      { name: "Financial Analysis", level: "advanced", yearsExp: 5 },
+      { name: "Excel", level: "expert", yearsExp: 6 },
+      { name: "SAP", level: "intermediate", yearsExp: 2 },
+    ],
+    certifications: [],
+    languages: [
+      { language: "English", proficiency: "native" },
+      { language: "Irish", proficiency: "conversational" },
+    ],
+    availability: "available",
+    maxCapacity: 3,
+    schedule: [
+      { dayOfWeek: "monday", startTime: "09:00", endTime: "17:30", type: "office" },
+      { dayOfWeek: "tuesday", startTime: "09:00", endTime: "17:30", type: "office" },
+      { dayOfWeek: "wednesday", startTime: "09:00", endTime: "17:30", type: "remote" },
+      { dayOfWeek: "thursday", startTime: "09:00", endTime: "17:30", type: "office" },
+      { dayOfWeek: "friday", startTime: "09:00", endTime: "16:00", type: "remote" },
+    ],
+    timeOff: [],
+  },
+  {
+    id: "a11",
+    name: "Yuki Tanaka",
+    email: "yuki.t@company.com",
+    avatar: "/professional-woman-avatar-5.png",
+    role: "Associate",
+    activeProjects: 3,
+    openTasks: 8,
+    milestonesOverdue: 1,
+    avgCycleTime: 2.3,
+    performanceScore: 82,
+    tasksCompletedHistory: [{ date: "2026-01-05", count: 7 }],
+    cycleTimeHistory: [{ date: "2026-01-05", time: 2.3 }],
+    approvalTurnaroundHistory: [{ date: "2026-01-05", time: 1.5 }],
+    topDelayReasons: ["Translation delays"],
+    phone: "+81 3 1234 5678",
+    department: "Implementation",
+    location: "Tokyo, JP",
+    startDate: "2023-04-01",
+    bio: "Associate with expertise in Japanese market implementations.",
+    strengths: ["Japanese Market Knowledge", "Localization", "Quality Control"],
+    skills: [
+      { name: "Localization", level: "advanced", yearsExp: 4 },
+      { name: "Project Coordination", level: "intermediate", yearsExp: 2 },
+    ],
+    certifications: [],
+    languages: [
+      { language: "Japanese", proficiency: "native" },
+      { language: "English", proficiency: "fluent" },
+    ],
+    availability: "available",
+    maxCapacity: 4,
+    schedule: [
+      { dayOfWeek: "monday", startTime: "09:00", endTime: "18:00", type: "office" },
+      { dayOfWeek: "tuesday", startTime: "09:00", endTime: "18:00", type: "office" },
+      { dayOfWeek: "wednesday", startTime: "09:00", endTime: "18:00", type: "office" },
+      { dayOfWeek: "thursday", startTime: "09:00", endTime: "18:00", type: "remote" },
+      { dayOfWeek: "friday", startTime: "09:00", endTime: "17:00", type: "remote" },
+    ],
+    timeOff: [],
+  },
+  {
+    id: "a12",
+    name: "Ahmed Hassan",
+    email: "ahmed.h@company.com",
+    avatar: "/professional-man-avatar-5.png",
+    role: "Senior Associate",
+    activeProjects: 5,
+    openTasks: 14,
+    milestonesOverdue: 0,
+    avgCycleTime: 1.6,
+    performanceScore: 93,
+    tasksCompletedHistory: [{ date: "2026-01-05", count: 15 }],
+    cycleTimeHistory: [{ date: "2026-01-05", time: 1.6 }],
+    approvalTurnaroundHistory: [{ date: "2026-01-05", time: 0.7 }],
+    topDelayReasons: [],
+    phone: "+966 50 987 6543",
+    department: "Technical Solutions",
+    location: "Riyadh, SA",
+    startDate: "2021-09-01",
+    bio: "Senior technical specialist leading GCC region implementations.",
+    strengths: ["Technical Leadership", "GCC Market", "Enterprise Architecture"],
+    skills: [
+      { name: "Solution Architecture", level: "expert", yearsExp: 7 },
+      { name: "Oracle", level: "advanced", yearsExp: 5 },
+      { name: "SAP", level: "advanced", yearsExp: 4 },
+    ],
+    certifications: [
+      { name: "Oracle Cloud Infrastructure Architect Professional", issuer: "Oracle", date: "2023-08-20" },
+    ],
+    languages: [
+      { language: "Arabic", proficiency: "native" },
+      { language: "English", proficiency: "fluent" },
+    ],
+    availability: "available",
+    maxCapacity: 6,
+    schedule: [
+      { dayOfWeek: "sunday", startTime: "08:00", endTime: "17:00", type: "office" },
+      { dayOfWeek: "monday", startTime: "08:00", endTime: "17:00", type: "office" },
+      { dayOfWeek: "tuesday", startTime: "08:00", endTime: "17:00", type: "office" },
+      { dayOfWeek: "wednesday", startTime: "08:00", endTime: "17:00", type: "office" },
+      { dayOfWeek: "thursday", startTime: "08:00", endTime: "17:00", type: "office" },
+    ],
+    timeOff: [],
+  },
+  {
+    id: "a13",
+    name: "Sophie Martin",
+    email: "sophie.m@company.com",
+    avatar: "/professional-woman-avatar-6.png",
+    role: "Associate",
+    activeProjects: 2,
+    openTasks: 4,
+    milestonesOverdue: 0,
+    avgCycleTime: 1.8,
+    performanceScore: 87,
+    tasksCompletedHistory: [{ date: "2026-01-05", count: 10 }],
+    cycleTimeHistory: [{ date: "2026-01-05", time: 1.8 }],
+    approvalTurnaroundHistory: [{ date: "2026-01-05", time: 1.0 }],
+    topDelayReasons: [],
+    phone: "+33 1 23 45 67 89",
+    department: "Client Services",
+    location: "Paris, FR",
+    startDate: "2024-03-15",
+    bio: "Associate with expertise in European compliance and regulations.",
+    strengths: ["Regulatory Compliance", "GDPR", "Documentation"],
+    skills: [
+      { name: "Compliance", level: "advanced", yearsExp: 4 },
+      { name: "GDPR", level: "expert", yearsExp: 3 },
+      { name: "Documentation", level: "advanced", yearsExp: 4 },
+    ],
+    certifications: [
+      { name: "CIPP/E", issuer: "IAPP", date: "2023-11-10" },
+    ],
+    languages: [
+      { language: "French", proficiency: "native" },
+      { language: "English", proficiency: "fluent" },
+      { language: "German", proficiency: "conversational" },
+    ],
+    availability: "available",
+    maxCapacity: 3,
+    schedule: [
+      { dayOfWeek: "monday", startTime: "09:00", endTime: "18:00", type: "office" },
+      { dayOfWeek: "tuesday", startTime: "09:00", endTime: "18:00", type: "office" },
+      { dayOfWeek: "wednesday", startTime: "09:00", endTime: "18:00", type: "remote" },
+      { dayOfWeek: "thursday", startTime: "09:00", endTime: "18:00", type: "office" },
+      { dayOfWeek: "friday", startTime: "09:00", endTime: "16:00", type: "remote" },
+    ],
+    timeOff: [],
+  },
+  {
+    id: "a14",
+    name: "Raj Krishnan",
+    email: "raj.k@company.com",
+    avatar: "/professional-man-avatar-6.png",
+    role: "Associate",
+    activeProjects: 3,
+    openTasks: 7,
+    milestonesOverdue: 0,
+    avgCycleTime: 2.0,
+    performanceScore: 85,
+    tasksCompletedHistory: [{ date: "2026-01-05", count: 9 }],
+    cycleTimeHistory: [{ date: "2026-01-05", time: 2.0 }],
+    approvalTurnaroundHistory: [{ date: "2026-01-05", time: 1.1 }],
+    topDelayReasons: ["Cross-team dependencies"],
+    phone: "+65 9876 5432",
+    department: "Implementation",
+    location: "Singapore, SG",
+    startDate: "2023-08-01",
+    bio: "Implementation specialist for APAC region with fintech background.",
+    strengths: ["Fintech", "APAC Markets", "Integration"],
+    skills: [
+      { name: "System Integration", level: "advanced", yearsExp: 4 },
+      { name: "Fintech Systems", level: "advanced", yearsExp: 3 },
+      { name: "API Development", level: "intermediate", yearsExp: 2 },
+    ],
+    certifications: [],
+    languages: [
+      { language: "English", proficiency: "native" },
+      { language: "Tamil", proficiency: "fluent" },
+      { language: "Mandarin", proficiency: "basic" },
+    ],
+    availability: "available",
+    maxCapacity: 4,
+    schedule: [
+      { dayOfWeek: "monday", startTime: "09:00", endTime: "18:00", type: "office" },
+      { dayOfWeek: "tuesday", startTime: "09:00", endTime: "18:00", type: "office" },
+      { dayOfWeek: "wednesday", startTime: "09:00", endTime: "18:00", type: "office" },
+      { dayOfWeek: "thursday", startTime: "09:00", endTime: "18:00", type: "remote" },
+      { dayOfWeek: "friday", startTime: "09:00", endTime: "17:00", type: "remote" },
+    ],
+    timeOff: [],
+  },
 ]
 
 export const clients: Client[] = [
   {
     id: "c1",
     name: "Acme Corporation",
-    industry: "Manufacturing",
-    domain: "Industrial Equipment & Automation",
-    employeeCount: 5200,
-    foundedYear: 1985,
+    industry: "Technology",
+    domain: "Enterprise Software",
+    employeeCount: 5000,
+    foundedYear: 1995,
     status: "active",
     tier: "enterprise",
-    website: "https://acme-corp.com",
+    clientType: "standard",
+    website: "https://acme.com",
     description:
       "Global manufacturing leader specializing in industrial equipment and automation solutions. Long-standing partner since 2020 with multiple successful implementations.",
     address: {
@@ -556,6 +1113,18 @@ export const clients: Client[] = [
     totalRevenue: 850000,
     outstandingBalance: 45000,
     healthScore: 85,
+    healthOverride: null,
+    healthFactors: [
+      { factor: "Project Progress", score: 90, weight: 0.4, description: "Project is 65% complete." },
+      { factor: "Client Satisfaction", score: 80, weight: 0.3, description: "Client feedback is positive." },
+      { factor: "Associates Performance", score: 85, weight: 0.3, description: "Associates are meeting deadlines." },
+    ],
+    healthHistory: [
+      { date: "2025-12-01", score: 80, factors: [], note: "Initial health score." },
+      { date: "2025-12-15", score: 85, factors: [], note: "Progress update." },
+    ],
+    healthNotes: "Client is highly satisfied with the project progress.",
+    healthAlerts: [],
     notes: "Strategic account. Expanding into new regions. Potential for additional service lines.",
     tags: ["strategic", "manufacturing", "automation"],
     createdAt: "2020-03-15",
@@ -563,12 +1132,13 @@ export const clients: Client[] = [
   {
     id: "c2",
     name: "TechStart Inc",
-    industry: "Technology",
-    domain: "HR Technology / SaaS",
-    employeeCount: 85,
-    foundedYear: 2021,
+    industry: "SaaS",
+    domain: "B2B Software",
+    employeeCount: 150,
+    foundedYear: 2018,
     status: "active",
     tier: "startup",
+    clientType: "standard",
     website: "https://techstart.io",
     description:
       "Fast-growing SaaS startup focused on HR technology solutions. High potential for growth but requires close attention due to rapid scaling needs.",
@@ -602,20 +1172,33 @@ export const clients: Client[] = [
     totalRevenue: 125000,
     outstandingBalance: 15000,
     healthScore: 72,
+    healthOverride: null,
+    healthFactors: [
+      { factor: "Project Progress", score: 70, weight: 0.4, description: "Project is 25% complete." },
+      { factor: "Client Satisfaction", score: 75, weight: 0.3, description: "Client feedback is mixed." },
+      { factor: "Associates Performance", score: 70, weight: 0.3, description: "Associates are slightly delayed." },
+    ],
+    healthHistory: [
+      { date: "2025-12-01", score: 70, factors: [], note: "Initial health score." },
+      { date: "2025-12-15", score: 75, factors: [], note: "Progress update." },
+    ],
+    healthNotes: "Client is showing interest but requires more engagement.",
+    healthAlerts: [],
     notes: "High growth potential. Currently in onboarding phase. CEO is highly engaged.",
     tags: ["high-growth", "saas", "hr-tech"],
     createdAt: "2025-05-20",
   },
   {
     id: "c3",
-    name: "Global Finance Partners",
-    industry: "Financial Services",
-    domain: "Investment Banking & Asset Management",
-    employeeCount: 12500,
-    foundedYear: 1972,
+    name: "Global Retail Co",
+    industry: "Retail",
+    domain: "E-commerce",
+    employeeCount: 25000,
+    foundedYear: 1970,
     status: "active",
     tier: "enterprise",
-    website: "https://gfpartners.com",
+    clientType: "standard",
+    website: "https://globalretail.com",
     description:
       "Premier financial services firm with global operations. Strict compliance requirements and high security standards.",
     address: {
@@ -662,20 +1245,33 @@ export const clients: Client[] = [
     totalRevenue: 1250000,
     outstandingBalance: 180000,
     healthScore: 45,
+    healthOverride: null,
+    healthFactors: [
+      { factor: "Project Progress", score: 50, weight: 0.4, description: "Projects are 20% behind schedule." },
+      { factor: "Client Satisfaction", score: 40, weight: 0.3, description: "Client has escalated issues twice." },
+      { factor: "Associates Performance", score: 45, weight: 0.3, description: "Associates are delayed." },
+    ],
+    healthHistory: [
+      { date: "2025-12-01", score: 50, factors: [], note: "Initial health score." },
+      { date: "2025-12-15", score: 45, factors: [], note: "Progress update." },
+    ],
+    healthNotes: "Client is facing challenges with data migration.",
+    healthAlerts: [],
     notes: "Currently facing challenges with data migration. Requires executive attention. Risk of escalation.",
     tags: ["enterprise", "financial-services", "compliance", "at-risk"],
     createdAt: "2023-08-15",
   },
   {
     id: "c4",
-    name: "HealthCare Plus",
-    industry: "Healthcare",
-    domain: "Hospital Networks & Medical Services",
-    employeeCount: 8400,
-    foundedYear: 1998,
+    name: "Innovate Labs",
+    industry: "Research",
+    domain: "R&D Services",
+    employeeCount: 80,
+    foundedYear: 2020,
     status: "prospect",
-    tier: "mid-market",
-    website: "https://healthcareplus.org",
+    tier: "startup",
+    clientType: "standard",
+    website: "https://innovatelabs.co",
     description:
       "Regional healthcare provider network exploring digital transformation initiatives. Currently in sales discussions.",
     address: {
@@ -708,16 +1304,180 @@ export const clients: Client[] = [
     totalRevenue: 450000,
     outstandingBalance: 0,
     healthScore: 92,
+    healthOverride: null,
+    healthFactors: [
+      { factor: "Project Progress", score: 95, weight: 0.4, description: "All projects on track." },
+      { factor: "Client Satisfaction", score: 90, weight: 0.3, description: "Client highly satisfied." },
+      { factor: "Associates Performance", score: 95, weight: 0.3, description: "Associates are on track." },
+    ],
+    healthHistory: [
+      { date: "2025-12-01", score: 90, factors: [], note: "Initial health score." },
+      { date: "2025-12-15", score: 92, factors: [], note: "Progress update." },
+    ],
+    healthNotes: "Excellent relationship. Paid in full.",
+    healthAlerts: [],
     notes: "Excellent relationship. Paid in full. Discussing expansion to additional facilities.",
     tags: ["healthcare", "digital-transformation", "expansion-opportunity"],
     createdAt: "2024-11-01",
+    retainer: {
+      monthlyFee: 15000,
+      startDate: "2025-01-01",
+      endDate: "2027-12-31",
+      hoursIncluded: 100,
+      hoursUsed: 75,
+      services: ["Strategy Consulting", "System Integration Support", "Process Optimization"],
+      advisorId: "a1",
+      status: "active",
+    },
   },
   {
     id: "c5",
+    name: "Quantum Dynamics",
+    industry: "Manufacturing",
+    domain: "Industrial Automation",
+    employeeCount: 2500,
+    foundedYear: 1985,
+    status: "active",
+    tier: "mid-market",
+    clientType: "advisory",
+    website: "https://quantumdynamics.com",
+    description:
+      "Leading manufacturer of industrial automation solutions seeking strategic guidance on digital transformation.",
+    address: {
+      street: "500 Industrial Blvd",
+      city: "Detroit",
+      state: "MI",
+      country: "USA",
+      zip: "48201",
+    },
+    contacts: [
+      {
+        id: "cc5-1",
+        name: "Robert Chen",
+        role: "CEO",
+        email: "r.chen@quantumdynamics.com",
+        phone: "+1 313-555-0100",
+        isPrimary: true,
+      },
+    ],
+    contractStart: "2025-01-01",
+    totalRevenue: 180000,
+    outstandingBalance: 0,
+    healthScore: 92,
+    notes: "Long-term advisory client focused on digital transformation strategy",
+    tags: ["Advisory", "Manufacturing", "Digital Transformation"],
+    createdAt: "2025-01-01",
+    retainer: {
+      monthlyFee: 15000,
+      startDate: "2025-01-01",
+      hoursIncluded: 20,
+      hoursUsed: 14,
+      services: ["Strategic Planning", "Technology Assessment", "Executive Coaching", "Board Advisory"],
+      advisorId: "a1",
+      status: "active",
+    },
+  },
+  {
+    id: "c6",
+    name: "HealthFirst Medical",
+    industry: "Healthcare",
+    domain: "Medical Services",
+    employeeCount: 800,
+    foundedYear: 2005,
+    status: "active",
+    tier: "mid-market",
+    clientType: "advisory",
+    website: "https://healthfirstmedical.com",
+    description: "Regional healthcare provider seeking advisory support for operational excellence and compliance.",
+    address: {
+      street: "200 Medical Center Dr",
+      city: "Boston",
+      state: "MA",
+      country: "USA",
+      zip: "02115",
+    },
+    contacts: [
+      {
+        id: "cc6-1",
+        name: "Dr. Amanda Foster",
+        role: "Chief Medical Officer",
+        email: "a.foster@healthfirst.com",
+        phone: "+1 617-555-0200",
+        isPrimary: true,
+      },
+    ],
+    contractStart: "2025-06-01",
+    totalRevenue: 60000,
+    outstandingBalance: 10000,
+    healthScore: 78,
+    notes: "Advisory engagement focused on operational efficiency and regulatory compliance",
+    tags: ["Advisory", "Healthcare", "Compliance"],
+    createdAt: "2025-06-01",
+    retainer: {
+      monthlyFee: 10000,
+      startDate: "2025-06-01",
+      hoursIncluded: 15,
+      hoursUsed: 18,
+      services: ["Compliance Advisory", "Process Optimization", "Staff Training"],
+      advisorId: "a2",
+      status: "active",
+    },
+  },
+  {
+    id: "c7",
+    name: "GreenTech Solutions",
+    industry: "Clean Energy",
+    domain: "Renewable Energy",
+    employeeCount: 300,
+    foundedYear: 2015,
+    status: "active",
+    tier: "startup",
+    clientType: "advisory",
+    website: "https://greentechsolutions.com",
+    description: "Clean energy startup seeking advisory support for scaling operations and investor relations.",
+    address: {
+      street: "75 Solar Way",
+      city: "Austin",
+      state: "TX",
+      country: "USA",
+      zip: "78701",
+    },
+    contacts: [
+      {
+        id: "cc7-1",
+        name: "Jennifer Wu",
+        role: "Founder & CEO",
+        email: "j.wu@greentech.com",
+        phone: "+1 512-555-0300",
+        isPrimary: true,
+      },
+    ],
+    contractStart: "2025-09-01",
+    contractEnd: "2026-03-01",
+    totalRevenue: 30000,
+    outstandingBalance: 0,
+    healthScore: 88,
+    notes: "6-month advisory engagement for Series B preparation",
+    tags: ["Advisory", "Startup", "Fundraising"],
+    createdAt: "2025-09-01",
+    retainer: {
+      monthlyFee: 7500,
+      startDate: "2025-09-01",
+      endDate: "2026-03-01",
+      hoursIncluded: 12,
+      hoursUsed: 8,
+      services: ["Investor Relations", "Financial Modeling", "Growth Strategy"],
+      advisorId: "a3",
+      status: "active",
+    },
+  },
+  {
+    id: "c8", // Updated from c5 in original
     name: "RetailMax Group",
     industry: "Retail",
     status: "prospect",
     tier: "enterprise",
+    clientType: "standard",
     website: "https://retailmax.com",
     description:
       "National retail chain with 500+ stores. Interested in supply chain optimization and inventory management solutions.",
@@ -737,19 +1497,27 @@ export const clients: Client[] = [
         isPrimary: true,
       },
     ],
+    contractStart: "2026-01-01",
+    contractEnd: "2028-12-31",
     totalRevenue: 0,
     outstandingBalance: 0,
     healthScore: 0,
+    healthOverride: null,
+    healthFactors: [],
+    healthHistory: [],
+    healthNotes: "In discovery phase. RFP expected Q2 2026.",
+    healthAlerts: [],
     notes: "In discovery phase. RFP expected Q2 2026. Strong fit for our supply chain services.",
     tags: ["prospect", "retail", "supply-chain"],
     createdAt: "2025-12-01",
   },
   {
-    id: "c6",
+    id: "c9", // Updated from c6 in original
     name: "EduTech Solutions",
     industry: "Education",
     status: "inactive",
     tier: "mid-market",
+    clientType: "standard",
     website: "https://edutech-solutions.com",
     description: "Educational technology provider for K-12 schools. Previous engagement completed successfully.",
     address: {
@@ -773,6 +1541,18 @@ export const clients: Client[] = [
     totalRevenue: 275000,
     outstandingBalance: 0,
     healthScore: 78,
+    healthOverride: null,
+    healthFactors: [
+      { factor: "Project Progress", score: 100, weight: 0.4, description: "Project is 100% complete." },
+      { factor: "Client Satisfaction", score: 85, weight: 0.3, description: "Client feedback is positive." },
+      { factor: "Associates Performance", score: 90, weight: 0.3, description: "Associates met all deadlines." },
+    ],
+    healthHistory: [
+      { date: "2025-12-01", score: 75, factors: [], note: "Initial health score." },
+      { date: "2025-12-15", score: 78, factors: [], note: "Progress update." },
+    ],
+    healthNotes: "Contract ended Dec 2024. Good relationship.",
+    healthAlerts: [],
     notes: "Contract ended Dec 2024. Good relationship. Potential for re-engagement in 2026.",
     tags: ["education", "completed", "re-engagement"],
     createdAt: "2022-11-15",
@@ -807,7 +1587,58 @@ export const projects: Project[] = [
     createdAt: "2025-11-15",
     notes: [],
     uploads: [],
-    milestones: [],
+    milestones: [
+      {
+        id: "m1-p1",
+        title: "Phase 1: Discovery & Planning",
+        projectId: "p1",
+        startDate: "2026-01-20",
+        dueDate: "2026-02-21",
+        status: "in-progress",
+        completion: 60,
+        blockers: [],
+        tasks: [
+          { id: "t1-m1", title: "Executive Interviews", projectId: "p1", milestoneId: "m1-p1", assigneeId: "a1", status: "in-progress", priority: "high", dueDate: "2026-01-31", timeStarted: "2026-01-20" },
+          { id: "t2-m1", title: "Requirements Documentation", projectId: "p1", milestoneId: "m1-p1", assigneeId: "a2", status: "todo", priority: "high", dueDate: "2026-02-10" },
+          { id: "t3-m1", title: "Gap Analysis Report", projectId: "p1", milestoneId: "m1-p1", assigneeId: "a1", status: "todo", priority: "medium", dueDate: "2026-02-18" },
+          { id: "t4-m1", title: "Infrastructure Review", projectId: "p1", milestoneId: "m1-p1", assigneeId: "a6", status: "todo", priority: "high", dueDate: "2026-02-14" },
+          { id: "t5-m1", title: "Integration Mapping", projectId: "p1", milestoneId: "m1-p1", assigneeId: "a6", status: "todo", priority: "medium", dueDate: "2026-02-21" },
+        ]
+      },
+      {
+        id: "m2-p1",
+        title: "Phase 2: Implementation",
+        projectId: "p1",
+        startDate: "2026-02-24",
+        dueDate: "2026-04-11",
+        status: "not-started",
+        completion: 0,
+        blockers: [],
+        tasks: [
+          { id: "t1-m2", title: "Environment Configuration", projectId: "p1", milestoneId: "m2-p1", assigneeId: "a6", status: "todo", priority: "high", dueDate: "2026-03-07" },
+          { id: "t2-m2", title: "Data Migration - Phase 1", projectId: "p1", milestoneId: "m2-p1", assigneeId: "a9", status: "todo", priority: "high", dueDate: "2026-03-21" },
+          { id: "t3-m2", title: "Custom Module Development", projectId: "p1", milestoneId: "m2-p1", assigneeId: "a6", status: "todo", priority: "high", dueDate: "2026-04-04" },
+          { id: "t4-m2", title: "Training Material Development", projectId: "p1", milestoneId: "m2-p1", assigneeId: "a2", status: "todo", priority: "medium", dueDate: "2026-03-28" },
+          { id: "t5-m2", title: "End User Training Sessions", projectId: "p1", milestoneId: "m2-p1", assigneeId: "a2", status: "todo", priority: "medium", dueDate: "2026-04-11" },
+        ]
+      },
+      {
+        id: "m3-p1",
+        title: "Phase 3: Go-Live & Support",
+        projectId: "p1",
+        startDate: "2026-04-14",
+        dueDate: "2026-05-30",
+        status: "not-started",
+        completion: 0,
+        blockers: [],
+        tasks: [
+          { id: "t1-m3", title: "UAT Support", projectId: "p1", milestoneId: "m3-p1", assigneeId: "a1", status: "todo", priority: "high", dueDate: "2026-04-25" },
+          { id: "t2-m3", title: "Go-Live Execution", projectId: "p1", milestoneId: "m3-p1", assigneeId: "a4", status: "todo", priority: "high", dueDate: "2026-05-02" },
+          { id: "t3-m3", title: "Post Go-Live Support", projectId: "p1", milestoneId: "m3-p1", assigneeId: "a3", status: "todo", priority: "medium", dueDate: "2026-05-23" },
+          { id: "t4-m3", title: "Documentation & Handover", projectId: "p1", milestoneId: "m3-p1", assigneeId: "a2", status: "todo", priority: "low", dueDate: "2026-05-30" },
+        ]
+      }
+    ],
     costingRequests: [],
   },
   {
@@ -910,7 +1741,7 @@ export const projects: Project[] = [
     id: "p5",
     name: "HealthCare Systems Upgrade",
     client: "HealthCare Systems",
-    status: "Execution",
+    status: "Onboarding",
     lifecycle: "onboarding",
     health: "at-risk",
     onboardingStep: 11,
@@ -1234,7 +2065,8 @@ export const uploads: Upload[] = [
     id: "u1",
     fileName: "vendor_quote_acme.pdf",
     type: "Quote",
-    vendor: "Tech Solutions Inc",
+    associate: "Sarah Chen",
+    associateId: "a1",
     amount: 25000,
     currency: "USD",
     date: "2026-01-02",
@@ -1248,7 +2080,8 @@ export const uploads: Upload[] = [
     id: "u2",
     fileName: "invoice_dec_2025.pdf",
     type: "Invoice",
-    vendor: "Cloud Services Co",
+    associate: "Marcus Johnson",
+    associateId: "a2",
     amount: 15000,
     currency: "USD",
     date: "2025-12-28",
@@ -1262,7 +2095,8 @@ export const uploads: Upload[] = [
     id: "u3",
     fileName: "migration_quote.pdf",
     type: "Quote",
-    vendor: "DataMove Ltd",
+    associate: "David Kim",
+    associateId: "a4",
     amount: 45000,
     currency: "USD",
     date: "2026-01-04",
@@ -1276,7 +2110,8 @@ export const uploads: Upload[] = [
     id: "u4",
     fileName: "hosting_invoice.pdf",
     type: "Invoice",
-    vendor: "AWS",
+    associate: "Emily Rodriguez",
+    associateId: "a3",
     amount: 8500,
     currency: "USD",
     date: "2025-12-30",
@@ -1291,7 +2126,8 @@ export const uploads: Upload[] = [
     id: "u5",
     fileName: "security_audit_quote.pdf",
     type: "Quote",
-    vendor: "SecureIT Solutions",
+    associate: "Sarah Chen",
+    associateId: "a1",
     amount: 12000,
     currency: "USD",
     date: "2026-01-05",
