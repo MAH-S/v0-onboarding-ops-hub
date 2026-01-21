@@ -6,6 +6,7 @@ export interface TaskAssignee {
   associateId: string
   days: number // Total days for this assignee (manual input or calculated)
   daysPerPeriod?: number // e.g., 2 days per week (used when task has timeUnit week/month)
+  isLead?: boolean // First person added to a task is automatically the lead
 }
 
 // Task Pricing - links to actual project task

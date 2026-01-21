@@ -923,11 +923,15 @@ export const usePricingStore = create<PricingStore>((set, get) => ({
           return p
         }
         
+        // First person added is the lead
+        const isFirstAssignee = taskEntry.assignees.length === 0
+        
         // Add new assignee (simpler structure - days only, timeUnit is at task level)
         taskEntry.assignees.push({
           associateId,
           days: 0,
-          daysPerPeriod: 0
+          daysPerPeriod: 0,
+          isLead: isFirstAssignee
         })
         
         return {

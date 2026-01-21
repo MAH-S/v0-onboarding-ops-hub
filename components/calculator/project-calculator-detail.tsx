@@ -68,7 +68,8 @@ import {
   ChevronDown,
   ChevronRight,
   Plane,
-  Building2
+  Building2,
+  Star
 } from 'lucide-react'
 
 interface ProjectCalculatorDetailProps {
@@ -678,11 +679,16 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
                                       {/* Team Members */}
                                       <div className="flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
-                                          {taskAssignees.map(assignee => {
+                                          {taskAssignees.map((assignee, assigneeIndex) => {
                                             const assoc = getAssociate(assignee.associateId)
                                             if (!assoc) return null
+                                            // First assignee or one marked as lead is the lead
+                                            const isLead = assignee.isLead || (assigneeIndex === 0 && !taskAssignees.some(a => a.isLead))
                                             return (
-                                              <div key={assignee.associateId} className="flex items-center gap-1 bg-white border rounded-full pl-1 pr-1.5 py-0.5 shadow-sm hover:shadow transition-shadow group/chip">
+                                              <div key={assignee.associateId} className={`flex items-center gap-1 bg-white border rounded-full pl-1 pr-1.5 py-0.5 shadow-sm hover:shadow transition-shadow group/chip ${isLead ? 'border-amber-400 ring-1 ring-amber-200' : ''}`}>
+                                                {isLead && (
+                                                  <Star className="h-3 w-3 text-amber-500 fill-amber-500 flex-shrink-0" />
+                                                )}
                                                 <Avatar className="h-6 w-6">
                                                   <AvatarImage src={assoc.avatar || ''} />
                                                   <AvatarFallback className="text-[10px] bg-primary/10">{getAssociateInitials(assoc.name)}</AvatarFallback>
