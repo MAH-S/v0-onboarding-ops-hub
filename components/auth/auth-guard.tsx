@@ -20,6 +20,9 @@ const ROUTE_PERMISSIONS: Record<string, keyof typeof ROLE_PERMISSIONS.elt> = {
   "/advisory": "advisory",
   "/revenue": "revenue",
   "/calculator": "calculator",
+  "/new-business": "newBusiness",
+  "/broker-onboarding": "brokerOnboarding",
+  "/admin": "userManagement",
 }
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {

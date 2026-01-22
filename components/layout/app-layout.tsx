@@ -4,8 +4,6 @@ import type React from "react"
 
 import { Sidebar } from "./sidebar"
 import { Topbar } from "./topbar"
-import { CopilotDrawer } from "@/components/copilot/copilot-drawer"
-import { CopilotMinibar } from "@/components/copilot/copilot-minibar"
 import { AuthGuard } from "@/components/auth/auth-guard"
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -17,8 +15,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <Topbar />
           <main className="p-6">{children}</main>
         </div>
-        <CopilotDrawer />
-        <CopilotMinibar />
       </div>
     </AuthGuard>
   )

@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Search, Moon, Sun, Sparkles, LogOut } from "lucide-react"
+import { Bell, Search, Moon, Sun, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -24,7 +24,6 @@ import { useState, useEffect } from "react"
 import { useAppStore } from "@/lib/store"
 import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
-import { useCopilotStore } from "@/lib/copilot-store"
 import { useAuthStore, ROLE_LABELS } from "@/lib/auth-store"
 
 export function Topbar() {
@@ -32,7 +31,6 @@ export function Topbar() {
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const { projects, associates } = useAppStore()
-  const { openCopilot } = useCopilotStore()
   const router = useRouter()
   const { user, logout, hasPermission, canAccessProject } = useAuthStore()
 
@@ -78,14 +76,6 @@ export function Topbar() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={openCopilot} className="gap-2">
-            <Sparkles className="h-4 w-4" />
-            <span className="hidden sm:inline">Copilot</span>
-            <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-xs font-medium text-muted-foreground sm:flex">
-              <span className="text-xs">⌃</span>/
-            </kbd>
-          </Button>
-
           {mounted && (
             <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
               {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}

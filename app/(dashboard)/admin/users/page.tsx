@@ -50,8 +50,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
 import { 
   UserCog, 
   Plus, 
@@ -65,17 +75,85 @@ import {
   Users,
   Crown,
   Briefcase,
-  User
+  User,
+  Settings,
+  RotateCcw,
+  Check,
+  X,
+  Lock,
+  Unlock
 } from "lucide-react"
 import { toast } from "sonner"
 import { useUserStore } from "@/lib/user-store"
-import { useAuthStore, ROLE_LABELS, ROLE_DESCRIPTIONS, ROLE_PERMISSIONS, type UserRole, type AuthUser } from "@/lib/auth-store"
+import { useAuthStore, ROLE_LABELS, ROLE_DESCRIPTIONS, ROLE_PERMISSIONS, type UserRole, type AuthUser, type RolePermissions } from "@/lib/auth-store"
 import { useAppStore } from "@/lib/store"
 import Loading from "./loading"
 
+// Permission categories for better organization
+const PERMISSION_CATEGORIES = {
+  navigation: {
+    label: "Navigation Access",
+    description: "Control which pages users can access",
+    permissions: [
+      { key: "dashboard", label: "Dashboard", description: "View main dashboard" },
+      { key: "projects", label: "Projects", description: "Access projects list" },
+      { key: "projectBoard", label: "Project Board", description: "View project kanban board" },
+      { key: "clients", label: "Clients", description: "Access client management" },
+      { key: "associates", label: "Associates", description: "View associates list" },
+      { key: "documents", label: "Documents", description: "Access document storage" },
+      { key: "milestones", label: "Milestones", description: "View project milestones" },
+      { key: "performance", label: "Performance", description: "Access performance metrics" },
+      { key: "settings", label: "Settings", description: "Access system settings" },
+      { key: "revenue", label: "Revenue", description: "View revenue reports" },
+      { key: "advisory", label: "Advisory", description: "Access advisory features" },
+      { key: "calculator", label: "Calculator", description: "Use pricing calculator" },
+      { key: "userManagement", label: "User Management", description: "Manage user accounts" },
+      { key: "newBusiness", label: "New Business", description: "Access new business pipeline" },
+      { key: "brokerOnboarding", label: "Broker Onboarding", description: "Access broker onboarding" },
+    ]
+  },
+  projects: {
+    label: "Project Permissions",
+    description: "Control project-related actions",
+    permissions: [
+      { key: "createProject", label: "Create Projects", description: "Create new projects" },
+      { key: "editProject", label: "Edit Projects", description: "Modify project details" },
+      { key: "deleteProject", label: "Delete Projects", description: "Remove projects" },
+      { key: "viewAllProjects", label: "View All Projects", description: "See all projects in system" },
+      { key: "viewOwnProjectsOnly", label: "View Own Projects Only", description: "Limited to assigned projects" },
+      { key: "viewAssignedTasksOnly", label: "View Assigned Tasks Only", description: "Limited to assigned tasks" },
+    ]
+  },
+  clients: {
+    label: "Client Permissions",
+    description: "Control client-related actions",
+    permissions: [
+      { key: "createClient", label: "Create Clients", description: "Add new clients" },
+      { key: "editClient", label: "Edit Clients", description: "Modify client information" },
+    ]
+  },
+  team: {
+    label: "Team Permissions",
+    description: "Control team management actions",
+    permissions: [
+      { key: "createAssociate", label: "Create Associates", description: "Add new associates" },
+      { key: "editAssociate", label: "Edit Associates", description: "Modify associate profiles" },
+      { key: "manageTeam", label: "Manage Team", description: "Assign team members to projects" },
+    ]
+  },
+  admin: {
+    label: "Admin Permissions",
+    description: "Control administrative functions",
+    permissions: [
+      { key: "manageUsers", label: "Manage Users", description: "Add, edit, delete users" },
+      { key: "managePermissions", label: "Manage Permissions", description: "Change user permissions" },
+    ]
+  }
+}
+
 export default function AdminUsersPage() {
   const searchParams = useSearchParams()
-  const { users, addUser, updateUser, deleteUser, updateUserRole, toggleUserActive } = useUserStore()
+  const { users, addUser, updateUser, deleteUser, updateUserRole, toggleUserActive, updateUserPermission, resetUserPermissions } = useUserStore()
   const { user: currentUser, hasPermission } = useAuthStore()
   const { associates } = useAppStore()
   
@@ -85,6 +163,7 @@ export default function AdminUsersPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isPermissionsSheetOpen, setIsPermissionsSheetOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<AuthUser | null>(null)
   
   // Form state for add/edit
@@ -141,6 +220,25 @@ export default function AdminUsersPage() {
     return name.split(" ").map(n => n[0]).join("").toUpperCase()
   }
 
+  // Get effective permission value (custom override or role default)
+  const getEffectivePermission = (user: AuthUser, permKey: string): boolean => {
+    if (user.customPermissions && permKey in user.customPermissions) {
+      return user.customPermissions[permKey as keyof RolePermissions] as boolean
+    }
+    return ROLE_PERMISSIONS[user.role][permKey as keyof RolePermissions] as boolean
+  }
+
+  // Check if permission is customized
+  const isPermissionCustomized = (user: AuthUser, permKey: string): boolean => {
+    return user.customPermissions !== undefined && permKey in user.customPermissions
+  }
+
+  // Count customized permissions
+  const getCustomPermissionCount = (user: AuthUser): number => {
+    if (!user.customPermissions) return 0
+    return Object.keys(user.customPermissions).length
+  }
+
   const handleAddUser = () => {
     if (!formData.name || !formData.email) {
       toast.error("Please fill in all required fields")
@@ -187,6 +285,29 @@ export default function AdminUsersPage() {
     setSelectedUser(null)
   }
 
+  const handlePermissionToggle = (permKey: string, currentValue: boolean) => {
+    if (!selectedUser) return
+    updateUserPermission(selectedUser.id, permKey, !currentValue)
+    // Update local selected user state
+    setSelectedUser({
+      ...selectedUser,
+      customPermissions: {
+        ...selectedUser.customPermissions,
+        [permKey]: !currentValue
+      }
+    })
+  }
+
+  const handleResetPermissions = () => {
+    if (!selectedUser) return
+    resetUserPermissions(selectedUser.id)
+    setSelectedUser({
+      ...selectedUser,
+      customPermissions: undefined
+    })
+    toast.success("Permissions reset to role defaults")
+  }
+
   const openEditDialog = (user: AuthUser) => {
     setSelectedUser(user)
     setFormData({
@@ -203,6 +324,11 @@ export default function AdminUsersPage() {
     setIsDeleteDialogOpen(true)
   }
 
+  const openPermissionsSheet = (user: AuthUser) => {
+    setSelectedUser(user)
+    setIsPermissionsSheetOpen(true)
+  }
+
   // Check if current user can manage users
   if (!hasPermission("userManagement")) {
     return (
@@ -211,7 +337,7 @@ export default function AdminUsersPage() {
           <CardContent className="pt-6 text-center">
             <Shield className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h2 className="text-lg font-semibold mb-2">Access Denied</h2>
-            <p className="text-muted-foreground">You don't have permission to access user management.</p>
+            <p className="text-muted-foreground">You do not have permission to access user management.</p>
           </CardContent>
         </Card>
       </div>
@@ -434,15 +560,15 @@ export default function AdminUsersPage() {
                     <TableRow>
                       <TableHead>User</TableHead>
                       <TableHead>Role</TableHead>
+                      <TableHead>Permissions</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Linked Associate</TableHead>
                       <TableHead>Last Login</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredUsers.map((user) => {
-                      const linkedAssociate = associates.find(a => a.id === user.associateId)
+                      const customCount = getCustomPermissionCount(user)
                       return (
                         <TableRow key={user.id}>
                           <TableCell>
@@ -466,6 +592,22 @@ export default function AdminUsersPage() {
                             </Badge>
                           </TableCell>
                           <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 bg-transparent"
+                              onClick={() => openPermissionsSheet(user)}
+                            >
+                              <Settings className="h-3.5 w-3.5 mr-1.5" />
+                              Edit Access
+                              {customCount > 0 && (
+                                <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs bg-amber-100 text-amber-700">
+                                  {customCount} custom
+                                </Badge>
+                              )}
+                            </Button>
+                          </TableCell>
+                          <TableCell>
                             <div className="flex items-center gap-2">
                               <Switch
                                 checked={user.isActive}
@@ -479,13 +621,6 @@ export default function AdminUsersPage() {
                                 {user.isActive ? "Active" : "Inactive"}
                               </span>
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            {linkedAssociate ? (
-                              <span className="text-sm">{linkedAssociate.name}</span>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">-</span>
-                            )}
                           </TableCell>
                           <TableCell>
                             <span className="text-sm text-muted-foreground">
@@ -506,9 +641,9 @@ export default function AdminUsersPage() {
                                   <Pencil className="h-4 w-4 mr-2" />
                                   Edit User
                                 </DropdownMenuItem>
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openPermissionsSheet(user)}>
                                   <Shield className="h-4 w-4 mr-2" />
-                                  Change Role
+                                  Edit Permissions
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem 
@@ -540,7 +675,7 @@ export default function AdminUsersPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Permission Matrix</CardTitle>
-                <CardDescription>View and understand permissions for each role</CardDescription>
+                <CardDescription>Overview of default permissions by role. Edit individual user permissions from the Users tab.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -575,38 +710,28 @@ export default function AdminUsersPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {[
-                        { key: "dashboard", label: "Dashboard" },
-                        { key: "projects", label: "Projects" },
-                        { key: "projectBoard", label: "Project Board" },
-                        { key: "clients", label: "Clients" },
-                        { key: "associates", label: "Associates" },
-                        { key: "documents", label: "Documents" },
-                        { key: "milestones", label: "Milestones" },
-                        { key: "revenue", label: "Revenue" },
-                        { key: "performance", label: "Performance" },
-                        { key: "settings", label: "Settings" },
-                        { key: "calculator", label: "Calculator" },
-                        { key: "userManagement", label: "User Management" },
-                        { key: "createProject", label: "Create Projects" },
-                        { key: "editProject", label: "Edit Projects" },
-                        { key: "deleteProject", label: "Delete Projects" },
-                        { key: "manageTeam", label: "Manage Team" },
-                        { key: "manageUsers", label: "Manage Users" },
-                        { key: "managePermissions", label: "Manage Permissions" },
-                      ].map((perm) => (
-                        <TableRow key={perm.key}>
-                          <TableCell className="font-medium">{perm.label}</TableCell>
-                          {(["elt", "association-manager", "engagement-lead", "associate"] as UserRole[]).map(role => (
-                            <TableCell key={role} className="text-center">
-                              {ROLE_PERMISSIONS[role][perm.key as keyof typeof ROLE_PERMISSIONS.elt] ? (
-                                <Badge variant="default" className="bg-emerald-500">Yes</Badge>
-                              ) : (
-                                <Badge variant="secondary" className="text-muted-foreground">No</Badge>
-                              )}
+                      {Object.entries(PERMISSION_CATEGORIES).map(([catKey, category]) => (
+                        <>
+                          <TableRow key={catKey} className="bg-muted/50">
+                            <TableCell colSpan={5} className="font-semibold text-sm">
+                              {category.label}
                             </TableCell>
+                          </TableRow>
+                          {category.permissions.map((perm) => (
+                            <TableRow key={perm.key}>
+                              <TableCell className="text-sm">{perm.label}</TableCell>
+                              {(["elt", "association-manager", "engagement-lead", "associate"] as UserRole[]).map(role => (
+                                <TableCell key={role} className="text-center">
+                                  {ROLE_PERMISSIONS[role][perm.key as keyof typeof ROLE_PERMISSIONS.elt] ? (
+                                    <Check className="h-4 w-4 text-emerald-500 mx-auto" />
+                                  ) : (
+                                    <X className="h-4 w-4 text-slate-300 mx-auto" />
+                                  )}
+                                </TableCell>
+                              ))}
+                            </TableRow>
                           ))}
-                        </TableRow>
+                        </>
                       ))}
                     </TableBody>
                   </Table>
@@ -616,13 +741,13 @@ export default function AdminUsersPage() {
           </TabsContent>
         </Tabs>
 
-        {/* Edit Dialog */}
+        {/* Edit User Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Edit User</DialogTitle>
               <DialogDescription>
-                Update user information and permissions.
+                Update user information and role.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -683,6 +808,113 @@ export default function AdminUsersPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Permissions Sheet */}
+        <Sheet open={isPermissionsSheetOpen} onOpenChange={setIsPermissionsSheetOpen}>
+          <SheetContent className="w-full sm:max-w-lg">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-3">
+                {selectedUser && (
+                  <>
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={selectedUser.avatar || "/placeholder.svg"} />
+                      <AvatarFallback>{getInitials(selectedUser.name)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p>{selectedUser.name}</p>
+                      <Badge variant="outline" className={`${getRoleBadgeColor(selectedUser.role)} mt-1`}>
+                        {ROLE_LABELS[selectedUser.role]}
+                      </Badge>
+                    </div>
+                  </>
+                )}
+              </SheetTitle>
+              <SheetDescription>
+                Customize individual permissions. Changes override the default role permissions.
+              </SheetDescription>
+            </SheetHeader>
+            
+            {selectedUser && (
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="text-sm text-muted-foreground">
+                    {getCustomPermissionCount(selectedUser) > 0 ? (
+                      <span className="text-amber-600 font-medium">
+                        {getCustomPermissionCount(selectedUser)} custom permission{getCustomPermissionCount(selectedUser) !== 1 ? 's' : ''}
+                      </span>
+                    ) : (
+                      "Using default role permissions"
+                    )}
+                  </div>
+                  {getCustomPermissionCount(selectedUser) > 0 && (
+                    <Button variant="outline" size="sm" onClick={handleResetPermissions}>
+                      <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                      Reset to Defaults
+                    </Button>
+                  )}
+                </div>
+                
+                <ScrollArea className="h-[calc(100vh-280px)]">
+                  <div className="space-y-6 pr-4">
+                    {Object.entries(PERMISSION_CATEGORIES).map(([catKey, category]) => (
+                      <div key={catKey}>
+                        <div className="mb-3">
+                          <h4 className="font-semibold text-sm">{category.label}</h4>
+                          <p className="text-xs text-muted-foreground">{category.description}</p>
+                        </div>
+                        <div className="space-y-2">
+                          {category.permissions.map((perm) => {
+                            const effectiveValue = getEffectivePermission(selectedUser, perm.key)
+                            const isCustom = isPermissionCustomized(selectedUser, perm.key)
+                            const roleDefault = ROLE_PERMISSIONS[selectedUser.role][perm.key as keyof RolePermissions]
+                            
+                            return (
+                              <div
+                                key={perm.key}
+                                className={`flex items-center justify-between p-3 rounded-lg border ${
+                                  isCustom ? 'bg-amber-50 border-amber-200' : 'bg-background'
+                                }`}
+                              >
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-sm">{perm.label}</span>
+                                    {isCustom && (
+                                      <Badge variant="outline" className="h-5 text-[10px] bg-amber-100 text-amber-700 border-amber-300">
+                                        Custom
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">{perm.description}</p>
+                                  {isCustom && (
+                                    <p className="text-[10px] text-muted-foreground mt-1">
+                                      Role default: {roleDefault ? 'Allowed' : 'Denied'}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={effectiveValue}
+                                    onCheckedChange={() => handlePermissionToggle(perm.key, effectiveValue)}
+                                  />
+                                  {effectiveValue ? (
+                                    <Unlock className="h-4 w-4 text-emerald-500" />
+                                  ) : (
+                                    <Lock className="h-4 w-4 text-slate-400" />
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        <Separator className="mt-4" />
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+          </SheetContent>
+        </Sheet>
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

@@ -192,6 +192,7 @@ export interface AuthUser {
   isActive?: boolean
   createdAt?: string
   lastLogin?: string
+  customPermissions?: Partial<RolePermissions> // Override specific permissions for this user
 }
 
 interface AuthState {

@@ -158,6 +158,8 @@ interface AppState {
   updateCostingRequest: (id: string, updates: Partial<CostingRequest>) => void
   assignAssociateToProject: (associateId: string, projectId: string) => void
   removeAssociateFromProject: (associateId: string, projectId: string) => void
+  addAssociate: (associate: Associate) => void
+  updateAssociate: (id: string, updates: Partial<Associate>) => void
   toggleMondayConnection: () => void
   syncWithMonday: () => void
   addClient: (client: Client) => void
@@ -529,6 +531,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       associates: state.associates.map((a) =>
         a.id === associateId ? { ...a, activeProjects: Math.max(0, a.activeProjects - 1) } : a,
       ),
+    })),
+
+  addAssociate: (associate) =>
+    set((state) => ({
+      associates: [...state.associates, associate],
+    })),
+
+  updateAssociate: (id, updates) =>
+    set((state) => ({
+      associates: state.associates.map((a) => (a.id === id ? { ...a, ...updates } : a)),
     })),
 
   toggleMondayConnection: () => set((state) => ({ mondayConnected: !state.mondayConnected })),

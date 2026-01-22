@@ -10,6 +10,8 @@ interface UserManagementState {
   updateUserRole: (id: string, role: UserRole) => void
   toggleUserActive: (id: string) => void
   getUserById: (id: string) => AuthUser | undefined
+  updateUserPermission: (id: string, permissionKey: string, value: boolean) => void
+  resetUserPermissions: (id: string) => void
 }
 
 // Initial users with more metadata
@@ -149,6 +151,32 @@ export const useUserStore = create<UserManagementState>()(
 
       getUserById: (id) => {
         return get().users.find((user) => user.id === id)
+      },
+
+      updateUserPermission: (id, permissionKey, value) => {
+        set((state) => ({
+          users: state.users.map((user) =>
+            user.id === id
+              ? {
+                  ...user,
+                  customPermissions: {
+                    ...user.customPermissions,
+                    [permissionKey]: value,
+                  },
+                }
+              : user
+          ),
+        }))
+      },
+
+      resetUserPermissions: (id) => {
+        set((state) => ({
+          users: state.users.map((user) =>
+            user.id === id
+              ? { ...user, customPermissions: undefined }
+              : user
+          ),
+        }))
       },
     }),
     {
