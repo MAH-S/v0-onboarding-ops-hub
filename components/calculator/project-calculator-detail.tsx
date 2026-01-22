@@ -113,6 +113,7 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editingWorkstream, setEditingWorkstream] = useState<{phaseId: string, workstreamId: string, name: string} | null>(null)
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set())
+  const [phasesInitialized, setPhasesInitialized] = useState(false)
   
   const project = projects.find(p => p.id === projectId)
   const client = project ? clients.find(c => c.id === project.client) : null
@@ -120,17 +121,24 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
   useEffect(() => {
     if (projectId) {
       initProjectPricing(projectId)
+      // Reset phases initialized flag when project changes
+      setPhasesInitialized(false)
     }
   }, [projectId, initProjectPricing])
   
   const pricing = getProjectPricing(projectId)
   
-  // Expand all phases by default
+  // Expand all phases by default - only run once when project loads
   useEffect(() => {
-    if (pricing) {
-      setExpandedPhases(new Set(pricing.phases.map(p => p.id)))
+    if (project?.milestones && !phasesInitialized) {
+      // Use project milestones for the resourcing grid
+      const milestoneIds = project.milestones.map(m => m.id)
+      // Also include any pricing phases for backwards compatibility
+      const pricingPhaseIds = pricing?.phases?.map(p => p.id) || []
+      setExpandedPhases(new Set([...milestoneIds, ...pricingPhaseIds]))
+      setPhasesInitialized(true)
     }
-  }, [pricing])
+  }, [project?.milestones, pricing?.phases, phasesInitialized])
 
   const getAssociate = (id: string) => associates.find(a => a.id === id)
   
@@ -685,15 +693,15 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
                                             // First assignee or one marked as lead is the lead
                                             const isLead = assignee.isLead || (assigneeIndex === 0 && !taskAssignees.some(a => a.isLead))
                                             return (
-                                              <div key={assignee.associateId} className={`flex items-center gap-1 bg-white border rounded-full pl-1 pr-1.5 py-0.5 shadow-sm hover:shadow transition-shadow group/chip ${isLead ? 'border-amber-400 ring-1 ring-amber-200' : ''}`}>
+                                              <div key={assignee.associateId} className={`inline-flex items-center h-8 bg-white border rounded-full px-1.5 shadow-sm hover:shadow transition-shadow group/chip ${isLead ? 'border-amber-400 ring-1 ring-amber-200' : 'border-slate-200'}`}>
                                                 {isLead && (
-                                                  <Star className="h-3 w-3 text-amber-500 fill-amber-500 flex-shrink-0" />
+                                                  <Star className="h-3 w-3 text-amber-500 fill-amber-500 mr-0.5 flex-shrink-0" />
                                                 )}
-                                                <Avatar className="h-6 w-6">
+                                                <Avatar className="h-5 w-5 flex-shrink-0">
                                                   <AvatarImage src={assoc.avatar || ''} />
-                                                  <AvatarFallback className="text-[10px] bg-primary/10">{getAssociateInitials(assoc.name)}</AvatarFallback>
+                                                  <AvatarFallback className="text-[9px] bg-primary/10">{getAssociateInitials(assoc.name)}</AvatarFallback>
                                                 </Avatar>
-                                                <Input
+                                                <input
                                                   type="number"
                                                   value={taskTimeUnit === 'full' ? (assignee.days || '') : (assignee.daysPerPeriod || '')}
                                                   onChange={(e) => {
@@ -704,20 +712,19 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
                                                       updateTaskAssignee(projectId, phase.id, task.id, assignee.associateId, { daysPerPeriod: val })
                                                     }
                                                   }}
-                                                  className="h-5 w-8 text-xs text-center p-0 border-0 bg-transparent focus:ring-0"
+                                                  className="w-6 h-5 text-xs text-center bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                   placeholder="0"
                                                 />
-                                                <span className="text-[10px] text-muted-foreground mr-1">
+                                                <span className="text-[10px] text-muted-foreground">
                                                   {taskTimeUnit === 'full' ? 'd' : `/${taskTimeUnit === 'week' ? 'wk' : 'mo'}`}
                                                 </span>
-                                                <Button
-                                                  size="sm"
-                                                  variant="ghost"
-                                                  className="h-4 w-4 p-0 text-slate-400 hover:text-destructive opacity-0 group-hover/chip:opacity-100 transition-opacity"
+                                                <button
+                                                  type="button"
+                                                  className="ml-0.5 h-4 w-4 flex items-center justify-center text-slate-400 hover:text-destructive opacity-0 group-hover/chip:opacity-100 transition-opacity"
                                                   onClick={() => removeTaskAssignee(projectId, phase.id, task.id, assignee.associateId)}
                                                 >
                                                   <X className="h-3 w-3" />
-                                                </Button>
+                                                </button>
                                               </div>
                                             )
                                           })}

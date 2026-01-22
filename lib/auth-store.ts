@@ -18,6 +18,9 @@ export interface RolePermissions {
   revenue: boolean
   advisory: boolean
   calculator: boolean
+  userManagement: boolean // Admin page for user management
+  newBusiness: boolean // New Business Acquisition pipeline
+  brokerOnboarding: boolean // Broker Onboarding page
 
   // Feature access
   createProject: boolean
@@ -31,6 +34,8 @@ export interface RolePermissions {
   viewAllProjects: boolean
   viewOwnProjectsOnly: boolean // For engagement leads
   viewAssignedTasksOnly: boolean // For associates
+  manageUsers: boolean // Can add/edit/delete users
+  managePermissions: boolean // Can change user roles
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
@@ -48,6 +53,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     revenue: true,
     advisory: true,
     calculator: true,
+    userManagement: true,
+    newBusiness: true,
+    brokerOnboarding: true,
     createProject: true,
     editProject: true,
     deleteProject: true,
@@ -59,6 +67,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     viewAllProjects: true,
     viewOwnProjectsOnly: false,
     viewAssignedTasksOnly: false,
+    manageUsers: true,
+    managePermissions: true,
   },
 
   // Association Manager - Client access, associate profiles, team management
@@ -75,6 +85,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     revenue: true,
     advisory: true,
     calculator: true,
+    userManagement: false,
+    newBusiness: true,
+    brokerOnboarding: true,
     createProject: true,
     editProject: true,
     deleteProject: false,
@@ -86,6 +99,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     viewAllProjects: true,
     viewOwnProjectsOnly: false,
     viewAssignedTasksOnly: false,
+    manageUsers: false,
+    managePermissions: false,
   },
 
   // Engagement Lead - Only manage projects they lead
@@ -102,6 +117,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     revenue: false,
     advisory: false,
     calculator: false,
+    userManagement: false,
+    newBusiness: false,
+    brokerOnboarding: false,
     createProject: false,
     editProject: true,
     deleteProject: false,
@@ -113,6 +131,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     viewAllProjects: false,
     viewOwnProjectsOnly: true,
     viewAssignedTasksOnly: false,
+    manageUsers: false,
+    managePermissions: false,
   },
 
   // Associate - View assigned projects, task page only
@@ -129,6 +149,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     revenue: false,
     advisory: false,
     calculator: false,
+    userManagement: false,
+    newBusiness: false,
+    brokerOnboarding: false,
     createProject: false,
     editProject: false,
     deleteProject: false,
@@ -140,6 +163,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     viewAllProjects: false,
     viewOwnProjectsOnly: false,
     viewAssignedTasksOnly: true,
+    manageUsers: false,
+    managePermissions: false,
   },
 }
 
@@ -157,13 +182,16 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   associate: "View assigned projects and tasks",
 }
 
-interface AuthUser {
+export interface AuthUser {
   id: string
   name: string
   email: string
   role: UserRole
   avatar?: string
   associateId?: string // Link to Associate record if applicable
+  isActive?: boolean
+  createdAt?: string
+  lastLogin?: string
 }
 
 interface AuthState {

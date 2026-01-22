@@ -19,6 +19,9 @@ import {
   DollarSign,
   Briefcase,
   Calculator,
+  UserCog,
+  Target,
+  UserCheck,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -43,11 +46,16 @@ type NavItem = {
     | "settings"
     | "advisory"
     | "calculator"
+    | "userManagement"
+    | "newBusiness"
+    | "brokerOnboarding"
 }
 
 const navItems: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, permissionKey: "dashboard" },
   { href: "/projects", label: "Projects", icon: FolderKanban, permissionKey: "projects" },
+  { href: "/new-business", label: "New Business", icon: Target, permissionKey: "newBusiness" },
+  { href: "/broker-onboarding", label: "Broker Onboarding", icon: UserCheck, permissionKey: "brokerOnboarding" },
   { href: "/project-board", label: "Project Board", icon: Kanban, permissionKey: "projectBoard" },
   { href: "/clients", label: "Clients", icon: Building2, permissionKey: "clients" },
   { href: "/advisory", label: "Advisory", icon: Briefcase, permissionKey: "advisory" },
@@ -58,6 +66,7 @@ const navItems: NavItem[] = [
   { href: "/calculator", label: "Calculator", icon: Calculator, permissionKey: "calculator" },
   { href: "/performance", label: "Performance", icon: BarChart3, permissionKey: "performance" },
   { href: "/settings", label: "Settings", icon: Settings, permissionKey: "settings" },
+  { href: "/admin/users", label: "User Management", icon: UserCog, permissionKey: "userManagement" },
 ]
 
 export function Sidebar() {

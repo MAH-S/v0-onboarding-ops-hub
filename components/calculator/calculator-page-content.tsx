@@ -34,7 +34,7 @@ export function CalculatorPageContent() {
   // Filter projects based on search
   const filteredProjects = projects.filter(project => 
     project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    clients.find(c => c.id === project.clientId)?.name.toLowerCase().includes(searchQuery.toLowerCase())
+    clients.find(c => c.id === project.client)?.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   // Calculate stats
@@ -160,7 +160,7 @@ export function CalculatorPageContent() {
                 </TableRow>
               ) : (
                 filteredProjects.map(project => {
-                  const client = clients.find(c => c.id === project.clientId)
+                  const client = clients.find(c => c.id === project.client)
                   const status = getPricingStatus(project.id)
                   
                   return (

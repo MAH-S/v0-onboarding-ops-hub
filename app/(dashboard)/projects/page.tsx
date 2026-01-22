@@ -2,24 +2,31 @@
 
 import type React from "react"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Separator } from "@/components/ui/separator"
 import { useAppStore } from "@/lib/store"
 import type { Project, ProjectHealth, ProjectLifecycle } from "@/lib/mock-data"
 import { AddProjectDialog } from "@/components/projects/add-project-dialog"
-import { FolderKanban, Info } from "lucide-react"
+import { FolderKanban, Info, Trophy, ThumbsDown } from "lucide-react"
 import { toast } from "sonner"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuthStore } from "@/lib/auth-store"
+import { useBusinessAcquisitionStore } from "@/lib/business-acquisition-store"
 
 import { NewBusinessTable } from "@/components/projects/pipelines/new-business-table"
 import { OnboardingTable } from "@/components/projects/pipelines/onboarding-table"
 import { ExecutionTable } from "@/components/projects/pipelines/execution-table"
 import { ClosureTable } from "@/components/projects/pipelines/closure-table"
 import { LearningsTable } from "@/components/projects/pipelines/learnings-table"
+import { BusinessLossesTable } from "@/components/projects/pipelines/business-losses-table"
+import { BusinessWinsTable } from "@/components/projects/pipelines/business-wins-table"
 import { ProjectControlsSheet } from "@/components/projects/shared/project-controls-sheet"
+
+type ExtendedTab = ProjectLifecycle | "wins" | "losses"
 
 const LIFECYCLE_TABS: { value: ProjectLifecycle; label: string }[] = [
   { value: "new-business", label: "New Business Acquisition" },
@@ -29,7 +36,10 @@ const LIFECYCLE_TABS: { value: ProjectLifecycle; label: string }[] = [
   { value: "learnings", label: "Project Learnings" },
 ]
 
-export default function ProjectsPage() {
+function ProjectsPageContent() {
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get("tab")
+  
   const {
     projects,
     updateProjectOnboardingStep,
@@ -39,9 +49,10 @@ export default function ProjectsPage() {
     addRiskNote,
   } = useAppStore()
 
+  const { getWonLeads, getLostLeads } = useBusinessAcquisitionStore()
   const { user, hasPermission, canAccessProject } = useAuthStore()
 
-  const [activeTab, setActiveTab] = useState<ProjectLifecycle>("new-business")
+  const [activeTab, setActiveTab] = useState<ExtendedTab>("new-business")
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [controlsOpen, setControlsOpen] = useState(false)
 
@@ -51,6 +62,18 @@ export default function ProjectsPage() {
   const [editHealth, setEditHealth] = useState<ProjectHealth>("on-track")
   const [editFinanceBlocked, setEditFinanceBlocked] = useState(false)
   const [riskNote, setRiskNote] = useState("")
+
+  // Handle URL params for tab navigation
+  useEffect(() => {
+    if (tabParam === "losses") {
+      setActiveTab("losses")
+    } else if (tabParam === "wins") {
+      setActiveTab("wins")
+    }
+  }, [tabParam])
+
+  const wonLeads = getWonLeads()
+  const lostLeads = getLostLeads()
 
   const accessibleProjects = useMemo(() => {
     return projects.filter((p) => canAccessProject(p.ownerId, p.assignedAssociates))
@@ -76,6 +99,7 @@ export default function ProjectsPage() {
 
   // Filter projects by active tab (from accessible projects)
   const filteredProjects = useMemo(() => {
+    if (activeTab === "wins" || activeTab === "losses") return []
     return accessibleProjects.filter((p) => p.lifecycle === activeTab)
   }, [accessibleProjects, activeTab])
 
@@ -89,7 +113,7 @@ export default function ProjectsPage() {
   }
 
   const handleTabChange = (value: string) => {
-    setActiveTab(value as ProjectLifecycle)
+    setActiveTab(value as ExtendedTab)
   }
 
   const handleOpenControls = (e: React.MouseEvent, project: Project) => {
@@ -140,7 +164,17 @@ export default function ProjectsPage() {
     setControlsOpen(false)
   }
 
+  const isBusinessOutcomeTab = activeTab === "wins" || activeTab === "losses"
+
   const renderTable = () => {
+    if (activeTab === "wins") {
+      return <BusinessWinsTable />
+    }
+    
+    if (activeTab === "losses") {
+      return <BusinessLossesTable />
+    }
+
     const tableProps = {
       projects: filteredProjects,
       onOpenControls: handleOpenControls,
@@ -161,6 +195,28 @@ export default function ProjectsPage() {
       default:
         return <ExecutionTable {...tableProps} />
     }
+  }
+
+  const getTabTitle = () => {
+    if (activeTab === "wins") return "Business Wins"
+    if (activeTab === "losses") return "Business Losses"
+    return LIFECYCLE_TABS.find((t) => t.value === activeTab)?.label
+  }
+
+  const getTabDescription = () => {
+    if (activeTab === "wins") {
+      return `${wonLeads.length} won opportunit${wonLeads.length !== 1 ? "ies" : "y"}`
+    }
+    if (activeTab === "losses") {
+      return `${lostLeads.length} lost opportunit${lostLeads.length !== 1 ? "ies" : "y"}`
+    }
+    return `${filteredProjects.length} project${filteredProjects.length !== 1 ? "s" : ""} in this stage`
+  }
+
+  const getTabIcon = () => {
+    if (activeTab === "wins") return <Trophy className="h-5 w-5 text-emerald-500" />
+    if (activeTab === "losses") return <ThumbsDown className="h-5 w-5 text-red-500" />
+    return <FolderKanban className="h-5 w-5 text-primary" />
   }
 
   return (
@@ -184,6 +240,7 @@ export default function ProjectsPage() {
         </Alert>
       )}
 
+      {/* Project Lifecycle Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-5 h-auto">
           {LIFECYCLE_TABS.map((tab) => (
@@ -201,40 +258,89 @@ export default function ProjectsPage() {
         </TabsList>
       </Tabs>
 
+      {/* Business Outcomes Section */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-muted-foreground">Business Outcomes</p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab("wins")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${
+              activeTab === "wins" 
+                ? "bg-emerald-50 border-emerald-300 text-emerald-700" 
+                : "bg-background hover:bg-muted"
+            }`}
+          >
+            <Trophy className={`h-4 w-4 ${activeTab === "wins" ? "text-emerald-600" : "text-emerald-500"}`} />
+            <span className="text-sm font-medium">Business Wins</span>
+            <Badge variant="secondary" className={`${activeTab === "wins" ? "bg-emerald-200 text-emerald-800" : ""}`}>
+              {wonLeads.length}
+            </Badge>
+          </button>
+          <button
+            onClick={() => setActiveTab("losses")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${
+              activeTab === "losses" 
+                ? "bg-red-50 border-red-300 text-red-700" 
+                : "bg-background hover:bg-muted"
+            }`}
+          >
+            <ThumbsDown className={`h-4 w-4 ${activeTab === "losses" ? "text-red-600" : "text-red-500"}`} />
+            <span className="text-sm font-medium">Business Losses</span>
+            <Badge variant="secondary" className={`${activeTab === "losses" ? "bg-red-200 text-red-800" : ""}`}>
+              {lostLeads.length}
+            </Badge>
+          </button>
+        </div>
+      </div>
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <FolderKanban className="h-5 w-5 text-primary" />
-                {LIFECYCLE_TABS.find((t) => t.value === activeTab)?.label}
+                {getTabIcon()}
+                {getTabTitle()}
               </CardTitle>
-              <CardDescription>
-                {filteredProjects.length} project{filteredProjects.length !== 1 ? "s" : ""} in this stage
-              </CardDescription>
+              <CardDescription>{getTabDescription()}</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent>{renderTable()}</CardContent>
       </Card>
 
-      <ProjectControlsSheet
-        open={controlsOpen}
-        onOpenChange={setControlsOpen}
-        project={selectedProject}
-        activeTab={activeTab}
-        editNewBusinessStep={editNewBusinessStep}
-        setEditNewBusinessStep={setEditNewBusinessStep}
-        editOnboardingStep={editOnboardingStep}
-        setEditOnboardingStep={setEditOnboardingStep}
-        editHealth={editHealth}
-        setEditHealth={setEditHealth}
-        editFinanceBlocked={editFinanceBlocked}
-        setEditFinanceBlocked={setEditFinanceBlocked}
-        riskNote={riskNote}
-        setRiskNote={setRiskNote}
-        onSave={handleSaveControls}
-      />
+      {!isBusinessOutcomeTab && (
+        <ProjectControlsSheet
+          open={controlsOpen}
+          onOpenChange={setControlsOpen}
+          project={selectedProject}
+          activeTab={activeTab as ProjectLifecycle}
+          editNewBusinessStep={editNewBusinessStep}
+          setEditNewBusinessStep={setEditNewBusinessStep}
+          editOnboardingStep={editOnboardingStep}
+          setEditOnboardingStep={setEditOnboardingStep}
+          editHealth={editHealth}
+          setEditHealth={setEditHealth}
+          editFinanceBlocked={editFinanceBlocked}
+          setEditFinanceBlocked={setEditFinanceBlocked}
+          riskNote={riskNote}
+          setRiskNote={setRiskNote}
+          onSave={handleSaveControls}
+        />
+      )}
     </div>
   )
 }
+
+export default function ProjectsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ProjectsPageContent />
+    </Suspense>
+  )
+}
+
+function Loading() {
+  return null
+}
+
+export { Loading }
