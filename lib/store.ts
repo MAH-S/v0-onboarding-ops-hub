@@ -149,8 +149,11 @@ interface AppState {
   deleteTask: (id: string) => void
   addMilestone: (milestone: Milestone) => void
   addMilestoneWithTasks: (milestone: Omit<Milestone, "tasks">, tasks: Omit<Task, "id" | "milestoneId">[]) => void
+  addMilestoneToProject: (projectId: string, milestone: { id: string, title: string, startDate?: string, dueDate?: string }) => void
+  addTaskToMilestone: (projectId: string, milestoneId: string, task: { id: string, title: string, dueDate?: string }) => void
   updateMilestone: (id: string, updates: Partial<Milestone>) => void
   deleteMilestone: (id: string) => void
+  deleteMilestoneFromProject: (projectId: string, milestoneId: string) => void
   addUpload: (upload: Upload) => void
   updateUpload: (id: string, updates: Partial<Upload>) => void
   addNote: (note: Note) => void
@@ -491,6 +494,63 @@ export const useAppStore = create<AppState>((set, get) => ({
         projects: newProjects,
       }
     }),
+
+  // Add a milestone/phase directly to a project's milestones array
+  addMilestoneToProject: (projectId, milestone) =>
+    set((state) => ({
+      projects: state.projects.map((p) => {
+        if (p.id !== projectId) return p
+        const newMilestone = {
+          id: milestone.id,
+          title: milestone.title,
+          startDate: milestone.startDate || new Date().toISOString().split('T')[0],
+          dueDate: milestone.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          completion: 0,
+          tasks: [],
+        }
+        return {
+          ...p,
+          milestones: [...(p.milestones || []), newMilestone],
+        }
+      }),
+    })),
+
+  // Add a task to a milestone within a project
+  addTaskToMilestone: (projectId, milestoneId, task) =>
+    set((state) => ({
+      projects: state.projects.map((p) => {
+        if (p.id !== projectId) return p
+        return {
+          ...p,
+          milestones: (p.milestones || []).map((m) => {
+            if (m.id !== milestoneId) return m
+            const newTask = {
+              id: task.id,
+              title: task.title,
+              status: 'todo' as const,
+              dueDate: task.dueDate || m.dueDate,
+              assignee: '',
+            }
+            return {
+              ...m,
+              tasks: [...m.tasks, newTask],
+            }
+          }),
+        }
+      }),
+    })),
+
+  // Delete a milestone from a project
+  deleteMilestoneFromProject: (projectId, milestoneId) =>
+    set((state) => ({
+      projects: state.projects.map((p) => {
+        if (p.id !== projectId) return p
+        return {
+          ...p,
+          milestones: (p.milestones || []).filter((m) => m.id !== milestoneId),
+        }
+      }),
+    })),
 
   addUpload: (upload) => set((state) => ({ uploads: [...state.uploads, upload] })),
 

@@ -79,7 +79,7 @@ interface ProjectCalculatorDetailProps {
 const PHASE_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#06B6D4']
 
 export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailProps) {
-  const { projects, clients, associates } = useStore()
+  const { projects, clients, associates, addMilestoneToProject, addTaskToMilestone, deleteMilestoneFromProject } = useStore()
   const { 
     getProjectPricing, 
     initProjectPricing,
@@ -110,6 +110,8 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
   const [activeTab, setActiveTab] = useState('overview')
   const [addPhaseOpen, setAddPhaseOpen] = useState(false)
   const [newPhaseName, setNewPhaseName] = useState('')
+  const [addTaskOpen, setAddTaskOpen] = useState<string | null>(null) // phase ID when open
+  const [newTaskName, setNewTaskName] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editingWorkstream, setEditingWorkstream] = useState<{phaseId: string, workstreamId: string, name: string} | null>(null)
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set())
@@ -238,9 +240,44 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
 
   const handleAddPhase = () => {
     if (newPhaseName.trim()) {
+      // Generate a unique ID for the phase
+      const phaseId = `phase-${Date.now()}`
+      
+      // Add to project milestones (for the resourcing grid)
+      addMilestoneToProject(projectId, {
+        id: phaseId,
+        title: newPhaseName.trim(),
+      })
+      
+      // Add to pricing store phases
       addPhase(projectId, newPhaseName.trim())
+      
+      // Initialize milestone pricing for this phase
+      const pricing = getProjectPricing(projectId)
+      if (pricing && !pricing.milestonePricing?.find(mp => mp.milestoneId === phaseId)) {
+        // The milestone pricing will be created when tasks are added
+      }
+      
+      // Expand the new phase
+      setExpandedPhases(prev => new Set([...prev, phaseId]))
+      
       setNewPhaseName('')
       setAddPhaseOpen(false)
+    }
+  }
+
+  const handleAddTask = (phaseId: string) => {
+    if (newTaskName.trim()) {
+      const taskId = `task-${Date.now()}`
+      
+      // Add task to the project milestone
+      addTaskToMilestone(projectId, phaseId, {
+        id: taskId,
+        title: newTaskName.trim(),
+      })
+      
+      setNewTaskName('')
+      setAddTaskOpen(null)
     }
   }
 
@@ -629,6 +666,10 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
                           {phase.tasks.length === 0 ? (
                             <div className="p-8 text-center text-muted-foreground">
                               <p className="mb-3">No tasks in this phase</p>
+                              <Button size="sm" variant="outline" onClick={() => setAddTaskOpen(phase.id)}>
+                                <Plus className="h-4 w-4 mr-1" />
+                                Add Task
+                              </Button>
                             </div>
                           ) : (
                             <div className="divide-y">
@@ -769,6 +810,47 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
                                   </div>
                                 )
                               })}
+                              
+                              {/* Add Task Button */}
+                              <div className="px-4 py-2 border-t bg-slate-50/50">
+                                {addTaskOpen === phase.id ? (
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      placeholder="Task name..."
+                                      value={newTaskName}
+                                      onChange={(e) => setNewTaskName(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleAddTask(phase.id)
+                                        if (e.key === 'Escape') {
+                                          setAddTaskOpen(null)
+                                          setNewTaskName('')
+                                        }
+                                      }}
+                                      className="h-8 text-sm flex-1"
+                                      autoFocus
+                                    />
+                                    <Button size="sm" className="h-8" onClick={() => handleAddTask(phase.id)}>
+                                      Add
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-8" onClick={() => {
+                                      setAddTaskOpen(null)
+                                      setNewTaskName('')
+                                    }}>
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                                    onClick={() => setAddTaskOpen(phase.id)}
+                                  >
+                                    <Plus className="h-3 w-3 mr-1" />
+                                    Add Task
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           )}
                         </CardContent>
