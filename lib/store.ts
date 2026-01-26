@@ -150,7 +150,7 @@ interface AppState {
   addMilestone: (milestone: Milestone) => void
   addMilestoneWithTasks: (milestone: Omit<Milestone, "tasks">, tasks: Omit<Task, "id" | "milestoneId">[]) => void
   addMilestoneToProject: (projectId: string, milestone: { id: string, title: string, startDate?: string, dueDate?: string }) => void
-  addTaskToMilestone: (projectId: string, milestoneId: string, task: { id: string, title: string, dueDate?: string }) => void
+  addTaskToMilestone: (projectId: string, milestoneId: string, task: { id: string, title: string, startDate?: string, dueDate?: string }) => void
   updateMilestone: (id: string, updates: Partial<Milestone>) => void
   deleteMilestone: (id: string) => void
   deleteMilestoneFromProject: (projectId: string, milestoneId: string) => void
@@ -528,6 +528,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               id: task.id,
               title: task.title,
               status: 'todo' as const,
+              startDate: task.startDate || m.startDate,
               dueDate: task.dueDate || m.dueDate,
               assignee: '',
             }

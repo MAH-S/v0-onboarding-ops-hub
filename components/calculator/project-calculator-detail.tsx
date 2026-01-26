@@ -114,6 +114,8 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
   const [newPhaseEndDate, setNewPhaseEndDate] = useState('')
   const [addTaskOpen, setAddTaskOpen] = useState<string | null>(null) // phase ID when open
   const [newTaskName, setNewTaskName] = useState('')
+  const [newTaskStartDate, setNewTaskStartDate] = useState('')
+  const [newTaskEndDate, setNewTaskEndDate] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editingWorkstream, setEditingWorkstream] = useState<{phaseId: string, workstreamId: string, name: string} | null>(null)
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set())
@@ -276,9 +278,14 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
       addTaskToMilestone(projectId, phaseId, {
         id: taskId,
         title: taskName,
+        startDate: newTaskStartDate || undefined,
+        dueDate: newTaskEndDate || undefined,
       })
       
+      // Reset form
       setNewTaskName('')
+      setNewTaskStartDate('')
+      setNewTaskEndDate('')
       setAddTaskOpen(null)
     }
   }
@@ -668,30 +675,55 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
                           {phase.tasks.length === 0 ? (
                             <div className="p-6 text-center">
                               {addTaskOpen === phase.id ? (
-                                <div className="flex items-center justify-center gap-2 max-w-md mx-auto">
+                                <div className="space-y-3 max-w-lg mx-auto">
                                   <Input
                                     placeholder="Task name..."
                                     value={newTaskName}
                                     onChange={(e) => setNewTaskName(e.target.value)}
                                     onKeyDown={(e) => {
-                                      if (e.key === 'Enter' && newTaskName.trim()) handleAddTask(phase.id)
                                       if (e.key === 'Escape') {
                                         setAddTaskOpen(null)
                                         setNewTaskName('')
+                                        setNewTaskStartDate('')
+                                        setNewTaskEndDate('')
                                       }
                                     }}
-                                    className="h-9 text-sm flex-1"
+                                    className="h-9 text-sm"
                                     autoFocus
                                   />
-                                  <Button size="sm" className="h-9" onClick={() => handleAddTask(phase.id)} disabled={!newTaskName.trim()}>
-                                    Add
-                                  </Button>
-                                  <Button size="sm" variant="ghost" className="h-9" onClick={() => {
-                                    setAddTaskOpen(null)
-                                    setNewTaskName('')
-                                  }}>
-                                    Cancel
-                                  </Button>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                      <Label className="text-xs text-muted-foreground">Start Date</Label>
+                                      <Input
+                                        type="date"
+                                        value={newTaskStartDate}
+                                        onChange={(e) => setNewTaskStartDate(e.target.value)}
+                                        className="h-9 text-sm"
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-xs text-muted-foreground">End Date</Label>
+                                      <Input
+                                        type="date"
+                                        value={newTaskEndDate}
+                                        onChange={(e) => setNewTaskEndDate(e.target.value)}
+                                        className="h-9 text-sm"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-end gap-2">
+                                    <Button size="sm" variant="ghost" className="h-8" onClick={() => {
+                                      setAddTaskOpen(null)
+                                      setNewTaskName('')
+                                      setNewTaskStartDate('')
+                                      setNewTaskEndDate('')
+                                    }}>
+                                      Cancel
+                                    </Button>
+                                    <Button size="sm" className="h-8" onClick={() => handleAddTask(phase.id)} disabled={!newTaskName.trim()}>
+                                      Add Task
+                                    </Button>
+                                  </div>
                                 </div>
                               ) : (
                                 <div className="text-muted-foreground">
@@ -844,32 +876,57 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
                               })}
                               
                               {/* Add Task Button */}
-                              <div className="px-4 py-2 border-t bg-slate-50/50">
+                              <div className="px-4 py-3 border-t bg-slate-50/50">
                                 {addTaskOpen === phase.id ? (
-                                  <div className="flex items-center gap-2">
+                                  <div className="space-y-3">
                                     <Input
                                       placeholder="Task name..."
                                       value={newTaskName}
                                       onChange={(e) => setNewTaskName(e.target.value)}
                                       onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleAddTask(phase.id)
                                         if (e.key === 'Escape') {
                                           setAddTaskOpen(null)
                                           setNewTaskName('')
+                                          setNewTaskStartDate('')
+                                          setNewTaskEndDate('')
                                         }
                                       }}
-                                      className="h-8 text-sm flex-1"
+                                      className="h-8 text-sm"
                                       autoFocus
                                     />
-                                    <Button size="sm" className="h-8" onClick={() => handleAddTask(phase.id)}>
-                                      Add
-                                    </Button>
-                                    <Button size="sm" variant="ghost" className="h-8" onClick={() => {
-                                      setAddTaskOpen(null)
-                                      setNewTaskName('')
-                                    }}>
-                                      Cancel
-                                    </Button>
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div className="space-y-1">
+                                        <Label className="text-xs text-muted-foreground">Start Date</Label>
+                                        <Input
+                                          type="date"
+                                          value={newTaskStartDate}
+                                          onChange={(e) => setNewTaskStartDate(e.target.value)}
+                                          className="h-8 text-sm"
+                                        />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-xs text-muted-foreground">End Date</Label>
+                                        <Input
+                                          type="date"
+                                          value={newTaskEndDate}
+                                          onChange={(e) => setNewTaskEndDate(e.target.value)}
+                                          className="h-8 text-sm"
+                                        />
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center justify-end gap-2">
+                                      <Button size="sm" variant="ghost" className="h-8" onClick={() => {
+                                        setAddTaskOpen(null)
+                                        setNewTaskName('')
+                                        setNewTaskStartDate('')
+                                        setNewTaskEndDate('')
+                                      }}>
+                                        Cancel
+                                      </Button>
+                                      <Button size="sm" className="h-8" onClick={() => handleAddTask(phase.id)} disabled={!newTaskName.trim()}>
+                                        Add Task
+                                      </Button>
+                                    </div>
                                   </div>
                                 ) : (
                                   <Button
