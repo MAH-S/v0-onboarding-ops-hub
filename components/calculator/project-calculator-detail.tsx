@@ -762,7 +762,7 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
                                             value={taskTimeUnit}
                                             onValueChange={(value: TimeUnit) => updateTaskSettings(projectId, phase.id, task.id, { timeUnit: value })}
                                           >
-                                            <SelectTrigger className="h-8 w-20 text-xs">
+                                            <SelectTrigger className="h-8 w-20 text-xs [&>svg]:hidden">
                                               <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -777,7 +777,7 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
                                                 type="number"
                                                 value={taskPeriods || ''}
                                                 onChange={(e) => updateTaskSettings(projectId, phase.id, task.id, { numberOfPeriods: parseInt(e.target.value) || 0 })}
-                                                className="h-8 w-12 text-center text-xs"
+                                                className="h-8 w-12 text-center text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                 placeholder="0"
                                               />
                                               <span className="text-xs text-muted-foreground">{taskTimeUnit === 'week' ? 'wk' : 'mo'}</span>
