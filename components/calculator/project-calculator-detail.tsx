@@ -267,8 +267,14 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
   }
 
   const handleAddTask = (phaseId: string) => {
+    console.log("[v0] handleAddTask called with phaseId:", phaseId)
+    console.log("[v0] newTaskName:", newTaskName)
+    console.log("[v0] projectId:", projectId)
+    console.log("[v0] current milestones:", project?.milestones)
+    
     if (newTaskName.trim()) {
       const taskId = `task-${Date.now()}`
+      console.log("[v0] Creating task with id:", taskId)
       
       // Add task to the project milestone
       addTaskToMilestone(projectId, phaseId, {
@@ -276,8 +282,12 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
         title: newTaskName.trim(),
       })
       
+      console.log("[v0] addTaskToMilestone called")
+      
       setNewTaskName('')
       setAddTaskOpen(null)
+    } else {
+      console.log("[v0] newTaskName is empty, not adding task")
     }
   }
 
