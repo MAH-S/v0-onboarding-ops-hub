@@ -65,12 +65,10 @@ import {
   Settings,
   UserPlus,
   GanttChart,
-  ChevronDown,
-  ChevronRight,
   Plane,
   Building2,
   Star
-} from 'lucide-react'
+  } from 'lucide-react'
 
 interface ProjectCalculatorDetailProps {
   projectId: string
@@ -655,7 +653,6 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
                         onClick={() => togglePhase(phase.id)}
                       >
                         <div className="flex items-center gap-3">
-                          {isExpanded ? <ChevronDown className="h-5 w-5 text-slate-400" /> : <ChevronRight className="h-5 w-5 text-slate-400" />}
                           <Layers className="h-5 w-5 text-primary" />
                           <div>
                             <h3 className="font-semibold text-lg">{phase.title}</h3>
