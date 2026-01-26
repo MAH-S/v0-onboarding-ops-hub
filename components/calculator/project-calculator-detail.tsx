@@ -110,6 +110,8 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
   const [activeTab, setActiveTab] = useState('overview')
   const [addPhaseOpen, setAddPhaseOpen] = useState(false)
   const [newPhaseName, setNewPhaseName] = useState('')
+  const [newPhaseStartDate, setNewPhaseStartDate] = useState('')
+  const [newPhaseEndDate, setNewPhaseEndDate] = useState('')
   const [addTaskOpen, setAddTaskOpen] = useState<string | null>(null) // phase ID when open
   const [newTaskName, setNewTaskName] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -247,47 +249,37 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
       addMilestoneToProject(projectId, {
         id: phaseId,
         title: newPhaseName.trim(),
+        startDate: newPhaseStartDate || undefined,
+        dueDate: newPhaseEndDate || undefined,
       })
       
       // Add to pricing store phases
       addPhase(projectId, newPhaseName.trim())
       
-      // Initialize milestone pricing for this phase
-      const pricing = getProjectPricing(projectId)
-      if (pricing && !pricing.milestonePricing?.find(mp => mp.milestoneId === phaseId)) {
-        // The milestone pricing will be created when tasks are added
-      }
-      
       // Expand the new phase
       setExpandedPhases(prev => new Set([...prev, phaseId]))
       
+      // Reset form
       setNewPhaseName('')
+      setNewPhaseStartDate('')
+      setNewPhaseEndDate('')
       setAddPhaseOpen(false)
     }
   }
 
   const handleAddTask = (phaseId: string) => {
-    console.log("[v0] handleAddTask called with phaseId:", phaseId)
-    console.log("[v0] newTaskName:", newTaskName)
-    console.log("[v0] projectId:", projectId)
-    console.log("[v0] current milestones:", project?.milestones)
-    
-    if (newTaskName.trim()) {
+    const taskName = newTaskName.trim()
+    if (taskName) {
       const taskId = `task-${Date.now()}`
-      console.log("[v0] Creating task with id:", taskId)
       
       // Add task to the project milestone
       addTaskToMilestone(projectId, phaseId, {
         id: taskId,
-        title: newTaskName.trim(),
+        title: taskName,
       })
-      
-      console.log("[v0] addTaskToMilestone called")
       
       setNewTaskName('')
       setAddTaskOpen(null)
-    } else {
-      console.log("[v0] newTaskName is empty, not adding task")
     }
   }
 
@@ -674,12 +666,42 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
                       {isExpanded && (
                         <CardContent className="p-0 border-t bg-white">
                           {phase.tasks.length === 0 ? (
-                            <div className="p-8 text-center text-muted-foreground">
-                              <p className="mb-3">No tasks in this phase</p>
-                              <Button size="sm" variant="outline" onClick={() => setAddTaskOpen(phase.id)}>
-                                <Plus className="h-4 w-4 mr-1" />
-                                Add Task
-                              </Button>
+                            <div className="p-6 text-center">
+                              {addTaskOpen === phase.id ? (
+                                <div className="flex items-center justify-center gap-2 max-w-md mx-auto">
+                                  <Input
+                                    placeholder="Task name..."
+                                    value={newTaskName}
+                                    onChange={(e) => setNewTaskName(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && newTaskName.trim()) handleAddTask(phase.id)
+                                      if (e.key === 'Escape') {
+                                        setAddTaskOpen(null)
+                                        setNewTaskName('')
+                                      }
+                                    }}
+                                    className="h-9 text-sm flex-1"
+                                    autoFocus
+                                  />
+                                  <Button size="sm" className="h-9" onClick={() => handleAddTask(phase.id)} disabled={!newTaskName.trim()}>
+                                    Add
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-9" onClick={() => {
+                                    setAddTaskOpen(null)
+                                    setNewTaskName('')
+                                  }}>
+                                    Cancel
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="text-muted-foreground">
+                                  <p className="mb-3">No tasks in this phase</p>
+                                  <Button size="sm" variant="outline" onClick={() => setAddTaskOpen(phase.id)}>
+                                    <Plus className="h-4 w-4 mr-1" />
+                                    Add Task
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <div className="divide-y">
@@ -1553,7 +1575,14 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
       </Tabs>
 
       {/* Add Phase Dialog */}
-      <Dialog open={addPhaseOpen} onOpenChange={setAddPhaseOpen}>
+      <Dialog open={addPhaseOpen} onOpenChange={(open) => {
+        setAddPhaseOpen(open)
+        if (!open) {
+          setNewPhaseName('')
+          setNewPhaseStartDate('')
+          setNewPhaseEndDate('')
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Phase</DialogTitle>
@@ -1567,10 +1596,28 @@ export function ProjectCalculatorDetail({ projectId }: ProjectCalculatorDetailPr
                 placeholder="e.g., Phase 1 - Discovery"
               />
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Input
+                  type="date"
+                  value={newPhaseStartDate}
+                  onChange={(e) => setNewPhaseStartDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>End Date</Label>
+                <Input
+                  type="date"
+                  value={newPhaseEndDate}
+                  onChange={(e) => setNewPhaseEndDate(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddPhaseOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddPhase}>Add Phase</Button>
+            <Button onClick={handleAddPhase} disabled={!newPhaseName.trim()}>Add Phase</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
